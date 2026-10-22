@@ -1,0 +1,24 @@
+# entornos
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# datos, corridas y pesos (no se versionan)
+datos
+runs
+*.pt
+*.pth
+*.npy
+*.mat
+
+# código de terceros (ver README)
+third_party
+
+# salidas regeneradas
+*_ejecutado.ipynb
+
+# sistema
+Thumbs.db
+desktop.ini
+.DS_Store
