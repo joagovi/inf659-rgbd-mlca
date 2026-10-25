@@ -5,6 +5,7 @@ profundidad (`rgbd.CONDICIONES`).
     python src/entrenar_rgbd.py --humo                       # unos pasos y 20 imágenes: que todo corre
     python src/entrenar_rgbd.py --barrido E1                 # lr en la validación por escenas, semilla 0
     python src/entrenar_rgbd.py --exp E1 --lr 1e-3 --semilla 0   # con las 795, evaluación en el test
+    python src/entrenar_rgbd.py --reevaluar                  # condiciones nuevas en modelos ya entrenados
 
 Protocolo, igual para todos los experimentos:
 - Encoders congelados; se entrenan la fusión y la cabeza de EfficientViT (`rgbd.RGBD`).
@@ -159,6 +160,24 @@ def entrenar(exp, lr, semilla, epocas=60, lote=8, validacion=False, humo=False, 
     return out
 
 
+def reevaluar():
+    """Evalúa los modelos finales ya entrenados (runs/rgbd/E*_s*) en las condiciones que les falten, sin
+    reentrenar: carga cabeza.pt y añade los resultados a su resultado.json."""
+    for ruta in sorted(RUNS.glob("E*_lr*_s[0-9]/resultado.json")):
+        out = json.loads(ruta.read_text(encoding="utf-8"))
+        faltan = [c for c in rgbd.CONDICIONES if c not in out["resultados"]]
+        if not faltan:
+            continue
+        modelo = rgbd.RGBD(out["fusion"]).to(DEV)
+        info = modelo.load_state_dict(torch.load(ruta.parent / "cabeza.pt", map_location=DEV), strict=False)
+        assert not info.unexpected_keys and all(k.startswith(("evit.backbone", "defm")) for k in info.missing_keys)
+        datos = nyuv2.cache("test")
+        nuevos = evaluar(modelo, datos, np.arange(len(datos["rgb"])), faltan)
+        out["resultados"].update({c: nuevos[c] for c in faltan})
+        ruta.write_text(json.dumps(out, indent=1, ensure_ascii=False), encoding="utf-8")
+        print(ruta.parent.name, "  ".join(f"{c} {nuevos[c]['miou']:.2f}" for c in faltan), flush=True)
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--exp", choices=list(FUSION))
@@ -167,8 +186,11 @@ if __name__ == "__main__":
     ap.add_argument("--epocas", type=int, default=60)
     ap.add_argument("--barrido", choices=list(FUSION))
     ap.add_argument("--humo", action="store_true")
+    ap.add_argument("--reevaluar", action="store_true")
     a = ap.parse_args()
-    if a.humo:
+    if a.reevaluar:
+        reevaluar()
+    elif a.humo:
         for exp in ("E1", "E2", "E4"):
             entrenar(exp, 1e-3, 0, humo=True)
     elif a.barrido:

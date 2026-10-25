@@ -65,6 +65,18 @@ tools/         run a notebook end to end
 
 Code and notebooks are documented in Spanish.
 
+**Scripts produce the results; notebooks read and show them.** Training runs take 12–16 minutes each, so they
+are launched from the terminal with `src/entrenar_rgbd.py`, which applies the same protocol to every experiment
+(only `--exp` changes) and writes `runs/rgbd/<run>/resultado.json` with the mIoU per depth condition and per
+class. `11_e1_e2_nyuv2` only reads those files. Notebooks 09 and 10 compute without training (1–3 minutes).
+
+| File | Kind | Trains? | What it does |
+|---|---|---|---|
+| `src/entrenar_rgbd.py` | script | yes | Training, scene-level validation for the learning rate, final evaluation; `--reevaluar` adds new conditions to trained models |
+| `notebooks/09_mlca_bloque` | notebook | no | Checks of the MLCA block on synthetic data; frozen encoders' feature shapes |
+| `notebooks/10_nyuv2_huecos` | notebook | no | Real holes of NYUv2 raw depth |
+| `notebooks/11_e1_e2_nyuv2` | notebook | no | Tables and figures of E1 and E2 from `resultado.json` |
+
 ## Reproduce
 
 ```bash

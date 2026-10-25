@@ -28,6 +28,22 @@ privado del curso (Deep Learning INF659, PUCP, 2026-2).
 - **IA.** Escribió el módulo, los notebooks y el cargador, encontró la normalización con los huecos y propuso
   las dos decisiones; el equipo las aceptó.
 
+## D-02 · Ruido gaussiano en la profundidad
+
+**Fecha** 2026-10-25 · **Estado** 🟡 provisional · **Origen** el equipo: la propuesta incluye el ruido gaussiano
+entre las condiciones de evaluación y faltaba definirlo.
+
+- **Decisión.** Ruido gaussiano aditivo sobre la profundidad rellenada, en metros, con σ = 10, 20 y 50 cm
+  (`ruido_10cm`, `ruido_20cm`, `ruido_50cm` en `src/rgbd.py`), recortado a un mínimo de 0.1 m para no crear
+  huecos. Determinista por imagen. Los tres niveles siguen los de Liao et al. (σ = 0.1, 0.2 y 0.5), que allí
+  son fracciones del rango normalizado [0, 1]; aquí se expresan en metros, así que no son la misma escala.
+- **Cómo se mide.** Sobre los modelos finales ya entrenados, sin reentrenar
+  (`python src/entrenar_rgbd.py --reevaluar`), que añade las condiciones nuevas a cada `resultado.json`.
+  Recargar un modelo reproduce su resultado guardado (E2, semilla 0, completa: 47.54 en ambos casos).
+- **Por qué importa.** El ruido conserva valores, así que la máscara de validez no lo detecta: MLCA no tiene
+  ventaja de diseño frente a él (la «distinción técnica» de la propuesta).
+- **IA.** Propuso la definición y escribió el código; los niveles quedan pendientes de confirmar por el equipo.
+
 ## Predicciones de E1 y E2 (NYUv2, 40 clases)
 
 Registradas el 2026-10-21 en el repositorio del curso antes de entrenar. Se habían visto `09_mlca_bloque` y

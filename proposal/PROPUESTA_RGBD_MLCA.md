@@ -142,18 +142,23 @@ La evaluación principal se realizará en NYUv2. Cityscapes será una validació
 
 ## 8. Resultados preliminares
 
-Ya se entrenaron E1 y E2 en NYUv2, con los extractores congelados, tres semillas y evaluación en las 654 imágenes de prueba. Las predicciones del equipo se registraron antes de entrenar.
+**Comprobaciones previas, sin entrenamiento.** Antes de entrenar se verificó, con datos sintéticos, que el bloque MLCA cumple lo que promete: sin profundidad válida devuelve exactamente las características RGB; las posiciones inválidas quedan excluidas de forma exacta, aunque contengan valores arbitrarios; y su costo crece linealmente con el tamaño de la imagen (pendiente 1.14 en escala logarítmica, frente a 2.00 de la atención softmax). También se comprobó que los dos extractores congelados entregan características de la misma resolución a 1/8, 1/16 y 1/32 de la imagen, y se midieron los huecos reales de NYUv2: dentro de la zona central falta el 12.3 % de la profundidad en el conjunto de prueba.
 
-| Condición de la profundidad | E1 · solo RGB | E2 · concatenación |
-|---|---|---|
-| Completa | 44.99 ± 0.30 | 47.31 ± 0.26 |
-| Huecos reales del sensor | 44.99 ± 0.30 | 46.97 ± 0.52 |
-| Huecos aleatorios del 50 % | 44.99 ± 0.30 | 43.90 ± 0.12 |
-| Ausencia total | 44.99 ± 0.30 | 42.25 ± 0.45 |
+**E1 y E2.** Se entrenaron en NYUv2 con los extractores congelados, tres semillas y evaluación en las 654 imágenes de prueba. Las predicciones del equipo se registraron antes de entrenar.
 
-*mIoU (%) de 40 clases. E1 no usa profundidad, por lo que su valor no cambia entre condiciones. En la ausencia total se entrega a E2 un mapa de profundidad vacío: E2, entrenada siempre con profundidad, no puede distinguir la ausencia de un valor medido, por lo que no equivale a E1, que no tiene rama de profundidad.*
+| Condición de la profundidad | E1 · solo RGB | E2 · concatenación | E2 − E1 |
+|---|---|---|---|
+| Completa | 44.99 ± 0.30 | 47.31 ± 0.26 | +2.32 |
+| Huecos reales del sensor | 44.99 ± 0.30 | 46.97 ± 0.52 | +1.98 |
+| Huecos aleatorios del 10 % | 44.99 ± 0.30 | 46.66 ± 0.36 | +1.67 |
+| Huecos aleatorios del 30 % | 44.99 ± 0.30 | 44.82 ± 0.32 | −0.17 |
+| Huecos aleatorios del 50 % | 44.99 ± 0.30 | 43.90 ± 0.12 | −1.09 |
+| Regiones faltantes contiguas | 44.99 ± 0.30 | 46.58 ± 0.28 | +1.59 |
+| Ausencia total | 44.99 ± 0.30 | 42.25 ± 0.45 | −2.74 |
 
-Incorporar la profundidad sin máscara mejora la segmentación cuando está completa (+2.3 puntos), pero con la mitad de los píxeles faltantes o sin profundidad el resultado queda por debajo de la red solo RGB (−1.1 y −2.7 puntos). Es el problema que MLCA busca resolver. Además, se comprobó con datos sintéticos que, sin profundidad, el bloque MLCA devuelve exactamente las características RGB, y que su costo crece linealmente con el tamaño de la imagen. E3 a E6 están pendientes.
+*mIoU (%) de 40 clases. E1 no usa profundidad, por lo que su valor no cambia entre condiciones. Las regiones contiguas son rectángulos sin profundidad (corrupción* hole *de GeomPrompt [3], severidad 0.5). En la ausencia total se entrega a E2 un mapa de profundidad vacío: E2, entrenada siempre con profundidad, no puede distinguir la ausencia de un valor medido, por lo que no equivale a E1, que no tiene rama de profundidad. El ruido gaussiano está pendiente.*
+
+Incorporar la profundidad sin máscara mejora la segmentación cuando está completa (+2.3 puntos), pero la ventaja se reduce a medida que faltan píxeles: desaparece hacia el 30 % de huecos aleatorios y, con el 50 % o sin profundidad, el resultado queda por debajo de la red solo RGB (−1.1 y −2.7 puntos). Es el problema que MLCA busca resolver. E3 a E6 están pendientes.
 
 ## Referencias
 

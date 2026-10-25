@@ -104,7 +104,8 @@ class RGBD(nn.Module):
 
 
 # --------------------------------------------------------------------------------- condiciones de la profundidad
-CONDICIONES = ["completa", "cruda", "aleatoria_10", "aleatoria_30", "aleatoria_50", "regiones", "sin"]
+CONDICIONES = ["completa", "cruda", "aleatoria_10", "aleatoria_30", "aleatoria_50", "regiones", "sin",
+               "ruido_10cm", "ruido_20cm", "ruido_50cm"]
 
 
 def huecos_regiones(h, w, s, rng):
@@ -135,6 +136,10 @@ def condicion(nombre, prof_mm, cruda_mm, semilla):
         valida = (prof > 0) & ~huecos_regiones(*prof.shape, 0.5, rng)
     elif nombre == "sin":
         valida = np.zeros(prof.shape, bool)
+    elif nombre.startswith("ruido_"):                          # gaussiano aditivo de σ cm (D-02, provisional)
+        sigma = int(nombre.split("_")[1].removesuffix("cm")) / 100
+        valida = prof > 0                                      # el ruido conserva valores: la máscara no lo ve
+        prof = np.clip(prof + rng.normal(0, sigma, prof.shape), 0.1, None).astype(np.float32)
     else:
         raise ValueError(nombre)
     return np.where(valida, prof, 0).astype(np.float32), valida
