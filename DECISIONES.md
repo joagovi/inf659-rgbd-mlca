@@ -57,3 +57,18 @@ Registradas el 2026-10-21 en el repositorio del curso antes de entrenar. Se hab�
 
 E2 «sin profundidad» recibe un mapa de profundidad vacío; entrenada siempre con profundidad y sin máscara, no
 puede distinguir la ausencia de un valor medido, por lo que no equivale a E1, que no tiene rama de profundidad.
+
+## Predicciones de E4 (MLCA, NYUv2, 40 clases)
+
+Registradas el 2026-10-27 antes de entrenar E4. Se conocían los resultados de E1 y E2 de este repositorio; no se
+habían visto los resultados de E4 de ninguna otra implementación. Texto tal como se dijo.
+
+| Condición | Qué esperamos | Por qué | Resultado |
+|---|---|---|---|
+| Profundidad completa | «subirá entre 3 a 5 puntos con profundidad completa» (aclarado: sobre E2, 47.31 → 50.3 a 52.3) | no se escribió | pendiente |
+| 50 % de huecos | «en E2 creo que va subir levemente 1 punto y respecto a E1 si va caer un poco porque 50% es bastante hueco» (E2: 43.90; E1: 44.99) | «50% es bastante hueco» | pendiente |
+| Sin profundidad | «en realidad va a salir mejor que E1 [...] también entonces debería salir mejor a E2» (E1: 44.99; E2: 42.25) | «el color llegará intacto, porque la máscara saca esos rasgos» | pendiente |
+
+Una primera versión de la predicción sin profundidad («peor que E1, parecido a E2») se cambió antes de entrenar,
+después de que la IA explicara que el bloque MLCA suma exactamente 0 cuando no hay profundidad válida, mientras
+que en E2 los rasgos de DeFM de una imagen vacía no son cero.
