@@ -89,3 +89,7 @@ implementación). Texto tal como se dijo.
 | Experimento | Qué esperamos | Por qué | Resultado |
 |---|---|---|---|
 | E5 frente a E4 y a E1, en todas las condiciones | «el dropout hace que todo se mantenga igual o caída y según E1 creo que caerá» (se entiende: E5 igual o por debajo de E4, y por debajo de E1) | «dado los resultados anteriores» | pendiente |
+
+Aclaración del equipo, el mismo día y antes de ver resultados: «lo que decía era E5 por encima ligeramente o igual
+que E4, pero debajo de E1». Sustituye a la interpretación anterior («igual o por debajo de E4»). Con profundidad
+completa, E4 (45.24) ya está por encima de E1 (44.99): en esa condición las dos partes no pueden cumplirse a la vez.
