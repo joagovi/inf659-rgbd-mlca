@@ -88,7 +88,7 @@ implementación). Texto tal como se dijo.
 
 | Experimento | Qué esperamos | Por qué | Resultado |
 |---|---|---|---|
-| E5 frente a E4 y a E1, en todas las condiciones | «el dropout hace que todo se mantenga igual o caída y según E1 creo que caerá» (se entiende: E5 igual o por debajo de E4, y por debajo de E1) | «dado los resultados anteriores» | pendiente |
+| E5 frente a E4 y a E1, en todas las condiciones | «el dropout hace que todo se mantenga igual o caída y según E1 creo que caerá» (se entiende: E5 igual o por debajo de E4, y por debajo de E1) | «dado los resultados anteriores» | completa 45.48 ± 0.21, cruda 45.45 ± 0.20, aleatoria 10/30/50 % 45.32 / 44.46 / 44.25, regiones 45.39 ± 0.07, sin 45.74 ± 0.10, ruido 10/20/50 cm 45.40 / 45.29 / 44.79 |
 
 Aclaración del equipo, el mismo día y antes de ver resultados: «lo que decía era E5 por encima ligeramente o igual
 que E4, pero debajo de E1». Sustituye a la interpretación anterior («igual o por debajo de E4»). Con profundidad
@@ -98,3 +98,11 @@ Segunda aclaración, el mismo día y antes de ver resultados, para completa y cr
 «parece que con profundidad mejora ligeramente, entonces en ese caso que falta pienso que superará a ambos»
 (E5 por encima de E4 y de E1). En las demás condiciones sigue la anterior: igual o ligeramente por encima de E4 y
 por debajo de E1.
+
+Medido el 2026-10-28 (test, 3 semillas; lr 3e-4, elegida en la validación por escenas: 43.78, frente a 43.34 con
+1e-3 y 42.25 con 3e-3; de nuevo el extremo inferior del barrido). E5 no colapsa: entre todas las condiciones va de
+44.25 a 45.74, y sin profundidad queda 0.75 por encima de E1. Pero aprovecha poco la profundidad: con profundidad
+completa gana 0.49 a E1 (E2: 2.32) y queda por debajo de su propio resultado sin profundidad. **Diagnóstico**
+(semilla 0, 41 imágenes): lo que suma MLCA frente al color es |Δ|/|f| = 0.01, 0.46 y 0.02 a 1/8, 1/16 y 1/32 (E4:
+0.74, 0.89 y 9.43). Con el dropout, la red apagó casi del todo la fusión a 1/8 y 1/32 y solo la mantiene a 1/16.
+Ruido en E1 y E2, ya evaluado: E1 44.99 en los tres niveles; E2 46.66 / 46.25 / 45.25 con 10 / 20 / 50 cm.

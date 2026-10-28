@@ -9,7 +9,7 @@ profundidad (`rgbd.CONDICIONES`).
 
 Protocolo, igual para todos los experimentos:
 - Encoders congelados; se entrenan la fusión y la cabeza de EfficientViT (`rgbd.RGBD`).
-- Entrenamiento con la profundidad rellenada (`depths`). Aumento en la GPU: escala U(1, 1.5) con recorte
+- Entrenamiento con la profundidad rellenada (`depths`); en E5, el 30 % de las muestras sin profundidad. Aumento en la GPU: escala U(1, 1.5) con recorte
   aleatorio de 480×640 y volteo horizontal.
 - AdamW (decaimiento 0.01), lote 8, 100 pasos de calentamiento y caída polinómica (0.9); bf16.
 - Sin selección de época: se evalúa el modelo final. La lr se elige en una validación del 15 % de las escenas de
@@ -36,7 +36,8 @@ import rgbd  # noqa: E402
 import efficientvit_seg as sg  # noqa: E402
 
 RUNS = sg.RAIZ / "runs" / "rgbd"
-FUSION = {"E1": "rgb", "E2": "concat", "E4": "mlca"}
+FUSION = {"E1": "rgb", "E2": "concat", "E4": "mlca", "E5": "mlca"}
+DROPOUT = {"E5": 0.3}       # modality dropout: proporción de muestras que se entrenan sin ninguna profundidad
 LRS = (3e-4, 1e-3, 3e-3)
 DEV = "cuda"
 IGNORAR = 255
@@ -133,6 +134,9 @@ def entrenar(exp, lr, semilla, epocas=60, lote=8, validacion=False, humo=False, 
         orden = pos_tr[torch.randperm(len(pos_tr), generator=gen).numpy()]
         for k in range(0, len(orden) - lote + 1, lote):
             rgb, prof, et = aumentar(*lote_a_gpu(tr_datos, orden[k:k + lote]), gen)
+            if exp in DROPOUT:                          # la muestra pierde toda la profundidad, como «sin»
+                quita = torch.rand(len(prof), generator=gen) < DROPOUT[exp]
+                prof = torch.where(quita.to(DEV)[:, None, None, None], torch.zeros_like(prof), prof)
             with torch.autocast("cuda", dtype=torch.bfloat16):
                 lg = modelo(normalizar_rgb(rgb), prof / 1e3, prof > 0)
             lg = F.interpolate(lg.float(), et.shape[-2:], mode="bilinear", align_corners=False)
@@ -191,7 +195,7 @@ if __name__ == "__main__":
     if a.reevaluar:
         reevaluar()
     elif a.humo:
-        for exp in ("E1", "E2", "E4"):
+        for exp in ("E1", "E2", "E4", "E5"):
             entrenar(exp, 1e-3, 0, humo=True)
     elif a.barrido:
         for lr in LRS:
