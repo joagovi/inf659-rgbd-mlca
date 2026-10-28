@@ -65,10 +65,19 @@ habían visto los resultados de E4 de ninguna otra implementación. Texto tal co
 
 | Condición | Qué esperamos | Por qué | Resultado |
 |---|---|---|---|
-| Profundidad completa | «subirá entre 3 a 5 puntos con profundidad completa» (aclarado: sobre E2, 47.31 → 50.3 a 52.3) | no se escribió | pendiente |
-| 50 % de huecos | «en E2 creo que va subir levemente 1 punto y respecto a E1 si va caer un poco porque 50% es bastante hueco» (E2: 43.90; E1: 44.99) | «50% es bastante hueco» | pendiente |
-| Sin profundidad | «en realidad va a salir mejor que E1 [...] también entonces debería salir mejor a E2» (E1: 44.99; E2: 42.25) | «el color llegará intacto, porque la máscara saca esos rasgos» | pendiente |
+| Profundidad completa | «subirá entre 3 a 5 puntos con profundidad completa» (aclarado: sobre E2, 47.31 → 50.3 a 52.3) | no se escribió | 45.24 ± 0.29: −2.07 frente a E2 y +0.25 frente a E1 |
+| 50 % de huecos | «en E2 creo que va subir levemente 1 punto y respecto a E1 si va caer un poco porque 50% es bastante hueco» (E2: 43.90; E1: 44.99) | «50% es bastante hueco» | 41.89 ± 1.40: −2.01 frente a E2 y −3.10 frente a E1 (con 30 %: 42.04 ± 0.41) |
+| Sin profundidad | «en realidad va a salir mejor que E1 [...] también entonces debería salir mejor a E2» (E1: 44.99; E2: 42.25) | «el color llegará intacto, porque la máscara saca esos rasgos» | 0.78 ± 1.22 (0.03, 0.12 y 2.19 por semilla): la red colapsa |
 
 Una primera versión de la predicción sin profundidad («peor que E1, parecido a E2») se cambió antes de entrenar,
 después de que la IA explicara que el bloque MLCA suma exactamente 0 cuando no hay profundidad válida, mientras
 que en E2 los rasgos de DeFM de una imagen vacía no son cero.
+
+Medido el 2026-10-28 (test, 3 semillas; lr 3e-4, elegida en la validación por escenas: 44.15, frente a 42.81 con
+1e-3 y 42.31 con 3e-3; 3e-4 es el extremo inferior del barrido). Resto de condiciones de E4: cruda 45.04 ± 0.19,
+regiones 44.87 ± 0.39, ruido de 10/20/50 cm 45.05 / 44.90 / 44.18. **Diagnóstico del colapso sin profundidad**
+(semilla 0, 41 imágenes del test): el bloque funciona como se diseñó (sin profundidad suma exactamente 0), pero lo
+que suma con profundidad es grande frente a los rasgos de color: |Δ|/|f_color| = 0.74, 0.89 y **9.43** a 1/8, 1/16
+y 1/32 (en E2: 0.82, 0.67 y 1.36). La cabeza se entrenó siempre con ese término presente; al quitarlo recibe rasgos
+que nunca vio y predice casi una sola clase (97 % de los píxeles en 3 clases). Que el bloque aporte cero no hace
+que la red se comporte como E1: falta que la cabeza vea, al entrenar, casos sin profundidad (E5).
