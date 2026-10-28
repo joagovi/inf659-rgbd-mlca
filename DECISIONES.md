@@ -93,3 +93,8 @@ implementación). Texto tal como se dijo.
 Aclaración del equipo, el mismo día y antes de ver resultados: «lo que decía era E5 por encima ligeramente o igual
 que E4, pero debajo de E1». Sustituye a la interpretación anterior («igual o por debajo de E4»). Con profundidad
 completa, E4 (45.24) ya está por encima de E1 (44.99): en esa condición las dos partes no pueden cumplirse a la vez.
+
+Segunda aclaración, el mismo día y antes de ver resultados, para completa y cruda (donde E4 ya supera a E1):
+«parece que con profundidad mejora ligeramente, entonces en ese caso que falta pienso que superará a ambos»
+(E5 por encima de E4 y de E1). En las demás condiciones sigue la anterior: igual o ligeramente por encima de E4 y
+por debajo de E1.
