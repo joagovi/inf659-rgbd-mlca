@@ -81,3 +81,11 @@ que suma con profundidad es grande frente a los rasgos de color: |Δ|/|f_color| 
 y 1/32 (en E2: 0.82, 0.67 y 1.36). La cabeza se entrenó siempre con ese término presente; al quitarlo recibe rasgos
 que nunca vio y predice casi una sola clase (97 % de los píxeles en 3 clases). Que el bloque aporte cero no hace
 que la red se comporte como E1: falta que la cabeza vea, al entrenar, casos sin profundidad (E5).
+## Predicción de E5 (E4 + modality dropout de 0.3)
+
+Registrada el 2026-10-28, con E5 ya en entrenamiento y antes de ver ningún resultado suyo (tampoco el E5 de otra
+implementación). Texto tal como se dijo.
+
+| Experimento | Qué esperamos | Por qué | Resultado |
+|---|---|---|---|
+| E5 frente a E4 y a E1, en todas las condiciones | «el dropout hace que todo se mantenga igual o caída y según E1 creo que caerá» (se entiende: E5 igual o por debajo de E4, y por debajo de E1) | «dado los resultados anteriores» | pendiente |
