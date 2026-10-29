@@ -5,15 +5,19 @@ profundidad (`rgbd.CONDICIONES`).
     python src/entrenar_rgbd.py --humo                       # unos pasos y 20 imágenes: que todo corre
     python src/entrenar_rgbd.py --barrido E1                 # lr en la validación por escenas, semilla 0
     python src/entrenar_rgbd.py --exp E1 --lr 1e-3 --semilla 0   # con las 795, evaluación en el test
+    python src/entrenar_rgbd.py --completo E8                # barrido, elección y 3 semillas
     python src/entrenar_rgbd.py --reevaluar                  # condiciones nuevas en modelos ya entrenados
 
 Protocolo, igual para todos los experimentos:
-- Encoders congelados; se entrenan la fusión y la cabeza de EfficientViT (`rgbd.RGBD`).
-- Entrenamiento con la profundidad rellenada (`depths`); en E5, el 30 % de las muestras sin profundidad. Aumento en la GPU: escala U(1, 1.5) con recorte
+- Encoders congelados; se entrenan la fusión y la cabeza de EfficientViT (`rgbd.RGBD`). En E1u y E7 también la
+  última etapa del codificador de color, con una lr 10 veces menor (D-03).
+- Entrenamiento con la profundidad rellenada (`depths`); en E5, el 30 % de las muestras sin profundidad; en E8 y
+  E2h, huecos por muestra (`rgbd.huecos_entrenamiento`). Aumento en la GPU: escala U(1, 1.5) con recorte
   aleatorio de 480×640 y volteo horizontal.
 - AdamW (decaimiento 0.01), lote 8, 100 pasos de calentamiento y caída polinómica (0.9); bf16.
 - Sin selección de época: se evalúa el modelo final. La lr se elige en una validación del 15 % de las escenas de
-  entrenamiento (`nyuv2.validacion_por_escenas`), nunca en el test.
+  entrenamiento (`nyuv2.validacion_por_escenas`), nunca en el test. En E7 se usa la lr elegida para E1u y se
+  elige así el peso de la pérdida auxiliar.
 - mIoU sobre las 40 clases a 480×640, ignorando «sin etiqueta».
 
 Cada corrida deja en runs/rgbd/<nombre>/ resultado.json y cabeza.pt (solo lo entrenado).
@@ -36,8 +40,13 @@ import rgbd  # noqa: E402
 import efficientvit_seg as sg  # noqa: E402
 
 RUNS = sg.RAIZ / "runs" / "rgbd"
-FUSION = {"E1": "rgb", "E2": "concat", "E4": "mlca", "E5": "mlca"}
+FUSION = {"E1": "rgb", "E2": "concat", "E4": "mlca", "E5": "mlca",
+          "E1u": "rgb", "E7": "rgb", "E8": "respaldo", "E2h": "concat"}
 DROPOUT = {"E5": 0.3}       # modality dropout: proporción de muestras que se entrenan sin ninguna profundidad
+HUECOS = {"E8", "E2h"}      # huecos al entrenar (rgbd.huecos_entrenamiento); E2h es el control de E8
+ENTRENABLE = {"E1u": ("stage4",), "E7": ("stage4",)}    # etapas del codificador de color que se ajustan
+FACTOR_COD = 0.1            # lr de esas etapas = 0.1 × la de la cabeza
+AUX = {"E7": (1.0, 3.0, 10.0)}   # pesos de la pérdida auxiliar de profundidad que se barren en la validación
 LRS = (3e-4, 1e-3, 3e-3)
 DEV = "cuda"
 IGNORAR = 255
@@ -76,6 +85,47 @@ def normalizar_rgb(rgb):
     return (rgb.float() / 255 - sg.MEAN.to(DEV)) / sg.STD.to(DEV)
 
 
+def ce(lg, et):
+    """Entropía cruzada a la resolución de la etiqueta; 0 si el lote no tiene ningún píxel etiquetado."""
+    if not (et != IGNORAR).any():
+        return lg.sum() * 0
+    lg = F.interpolate(lg.float(), et.shape[-2:], mode="bilinear", align_corners=False)
+    return F.cross_entropy(lg, et, ignore_index=IGNORAR)
+
+
+def perdida_prof(pred, prof):
+    """Error cuadrático del log de la profundidad, invariante a la escala de cada imagen (Eigen et al., 2014):
+    var(log p̂ − log p) en las celdas de 1/8 con más de la mitad de los píxeles medidos. Invariante a la escala
+    porque el aumento amplía la imagen sin cambiar la profundidad. pred (B,1,h,w); prof (B,1,H,W) en mm."""
+    tam = pred.shape[-2:]
+    v = (prof > 0).float()
+    num, den = F.adaptive_avg_pool2d(prof * v, tam), F.adaptive_avg_pool2d(v, tam)
+    ok = den > 0.5
+    obj = torch.log((num / den.clamp_min(1e-6)).clamp_min(1.0) / 1e3)
+    g = torch.where(ok, pred.float() - obj, torch.zeros_like(obj))
+    n = ok.sum((1, 2, 3)).clamp_min(1)
+    m1, m2 = g.sum((1, 2, 3)) / n, (g ** 2).sum((1, 2, 3)) / n
+    return (m2 - m1 ** 2).mean()
+
+
+def construir(exp):
+    return rgbd.RGBD(FUSION[exp], entrenable=ENTRENABLE.get(exp, ()), aux_prof=exp in AUX).to(DEV)
+
+
+def nombre_corrida(exp, lr, semilla, validacion=False, aux=None, humo=False):
+    return (f"{'val_' if validacion else ''}{exp}_lr{lr:g}{'' if aux is None else f'_aux{aux:g}'}"
+            f"_s{semilla}{'_humo' if humo else ''}")
+
+
+def cargar(carpeta):
+    """Modelo final de una corrida (runs/rgbd/<nombre>/): se construye según su resultado.json y carga cabeza.pt."""
+    out = json.loads((carpeta / "resultado.json").read_text(encoding="utf-8"))
+    modelo = construir(out["exp"])
+    info = modelo.load_state_dict(torch.load(carpeta / "cabeza.pt", map_location=DEV), strict=False)
+    assert not info.unexpected_keys and all(k.startswith(("evit.backbone", "defm")) for k in info.missing_keys)
+    return modelo, out
+
+
 def evaluar(modelo, datos, posiciones, condiciones, lote=4):
     """mIoU por condición. Las condiciones son deterministas por imagen (semilla = índice en el split)."""
     modelo.eval()
@@ -103,9 +153,11 @@ def evaluar(modelo, datos, posiciones, condiciones, lote=4):
     return res
 
 
-def entrenar(exp, lr, semilla, epocas=60, lote=8, validacion=False, humo=False, nombre=None):
+def entrenar(exp, lr, semilla, epocas=60, lote=8, validacion=False, humo=False, nombre=None, aux=None):
     random.seed(semilla); np.random.seed(semilla); torch.manual_seed(semilla)
     gen = torch.Generator().manual_seed(semilla)
+    if exp in AUX and aux is None:
+        aux = AUX[exp][0]
     tr_datos = nyuv2.cache("entrenamiento")
     if validacion:
         pos_tr, pos_ev = nyuv2.validacion_por_escenas()
@@ -115,18 +167,22 @@ def entrenar(exp, lr, semilla, epocas=60, lote=8, validacion=False, humo=False, 
         pos_ev, condiciones = np.arange(len(ev_datos["rgb"])), rgbd.CONDICIONES
     if humo:
         epocas, pos_ev = 1, pos_ev[:20]
-    nombre = nombre or f"{'val_' if validacion else ''}{exp}_lr{lr:g}_s{semilla}{'_humo' if humo else ''}"
+    nombre = nombre or nombre_corrida(exp, lr, semilla, validacion, aux, humo)
     salida = RUNS / nombre
     salida.mkdir(parents=True, exist_ok=True)
 
-    modelo = rgbd.RGBD(FUSION[exp]).to(DEV)
-    opt = torch.optim.AdamW(modelo.entrenables(), lr=lr, weight_decay=0.01)
+    modelo = construir(exp)
+    nombres = [n for n, p in modelo.named_parameters() if p.requires_grad]
+    cod = [p for n, p in modelo.named_parameters() if p.requires_grad and n.startswith("evit.backbone")]
+    resto = [p for n, p in modelo.named_parameters() if p.requires_grad and not n.startswith("evit.backbone")]
+    grupos = [{"params": resto}] + ([{"params": cod, "lr": lr * FACTOR_COD}] if cod else [])
+    opt = torch.optim.AdamW(grupos, lr=lr, weight_decay=0.01)
     pasos_ep = len(pos_tr) // lote
     total = 5 if humo else epocas * pasos_ep
     sched = torch.optim.lr_scheduler.LambdaLR(
         opt, lambda t: min(1.0, (t + 1) / 100) * (1 - min(t, total - 1) / total) ** 0.9)
-    print(f"{nombre}: {sum(p.numel() for p in modelo.entrenables()) / 1e6:.2f} M entrenables, {total} pasos",
-          flush=True)
+    print(f"{nombre}: {sum(p.numel() for p in modelo.entrenables()) / 1e6:.2f} M entrenables "
+          f"({sum(p.numel() for p in cod) / 1e6:.2f} M del codificador), {total} pasos", flush=True)
 
     t0, paso, historial = time.time(), 0, []
     modelo.train()
@@ -137,10 +193,16 @@ def entrenar(exp, lr, semilla, epocas=60, lote=8, validacion=False, humo=False, 
             if exp in DROPOUT:                          # la muestra pierde toda la profundidad, como «sin»
                 quita = torch.rand(len(prof), generator=gen) < DROPOUT[exp]
                 prof = torch.where(quita.to(DEV)[:, None, None, None], torch.zeros_like(prof), prof)
+            if exp in HUECOS:
+                prof = rgbd.huecos_entrenamiento(prof, gen)
             with torch.autocast("cuda", dtype=torch.bfloat16):
-                lg = modelo(normalizar_rgb(rgb), prof / 1e3, prof > 0)
-            lg = F.interpolate(lg.float(), et.shape[-2:], mode="bilinear", align_corners=False)
-            perdida = F.cross_entropy(lg, et, ignore_index=IGNORAR)
+                sal = modelo(normalizar_rgb(rgb), prof / 1e3, prof > 0, todo=True)
+            perdida = ce(sal["seg"], et)
+            if "rgb" in sal:      # E8: cada experto con su pérdida; el de profundidad, solo donde hay medida
+                et_fus = torch.where(prof[:, 0] > 0, et, torch.full_like(et, IGNORAR))
+                perdida = perdida + ce(sal["rgb"], et) + ce(sal["fus"], et_fus)
+            if "prof" in sal:     # E7: la profundidad solo enseña
+                perdida = perdida + aux * perdida_prof(sal["prof"], prof)
             opt.zero_grad(set_to_none=True)
             perdida.backward()
             opt.step(); sched.step(); paso += 1
@@ -157,11 +219,46 @@ def entrenar(exp, lr, semilla, epocas=60, lote=8, validacion=False, humo=False, 
            "pasos": total, "validacion": validacion, "humo": humo, "minutos_entrenamiento": t_ent / 60,
            "perdida_final": float(np.mean(historial[-pasos_ep:])), "clases": nyuv2.clases40()[1:],
            "evaluado_en": "validación por escenas" if validacion else "test oficial (654)", "resultados": res}
+    if aux is not None:
+        out["aux"] = aux
+    if exp in ENTRENABLE:
+        out["entrenable"] = list(ENTRENABLE[exp])
     (salida / "resultado.json").write_text(json.dumps(out, indent=1, ensure_ascii=False), encoding="utf-8")
     torch.save({k: v for k, v in modelo.state_dict().items()
-                if not k.startswith(("evit.backbone", "defm"))}, salida / "cabeza.pt")
+                if not k.startswith(("evit.backbone", "defm")) or k in nombres}, salida / "cabeza.pt")
     print("  " + "  ".join(f"{c} {r['miou']:.2f}" for c, r in res.items()), flush=True)
     return out
+
+
+def elegida(exp):
+    """(lr, aux) con mayor mIoU en la validación por escenas (profundidad completa), y todas las cifras."""
+    val = {}
+    for ruta in RUNS.glob(f"val_{exp}_lr*_s0/resultado.json"):
+        out = json.loads(ruta.read_text(encoding="utf-8"))
+        val[(out["lr"], out.get("aux"))] = out["resultados"]["completa"]["miou"]
+    if not val:
+        raise FileNotFoundError(f"no hay barrido de {exp} en {RUNS}")
+    return max(val, key=val.get), val
+
+
+def completo(exp):
+    """Barrido en la validación por escenas, elección y 3 semillas en el test. En E7 la lr es la elegida para E1u
+    y lo que se barre es el peso de la pérdida auxiliar."""
+    if exp in AUX:
+        (lr, _), _ = elegida("E1u")
+        opciones = [(lr, a) for a in AUX[exp]]
+    else:
+        opciones = [(lr, None) for lr in LRS]
+    for lr, a in opciones:
+        if not (RUNS / nombre_corrida(exp, lr, 0, True, a) / "resultado.json").exists():
+            entrenar(exp, lr, 0, validacion=True, aux=a)
+    (lr, a), val = elegida(exp)
+    print(f"{exp}: validación " + ", ".join(f"lr {l:g}{'' if x is None else f' aux {x:g}'}: {v:.2f}"
+                                            for (l, x), v in sorted(val.items(), key=str)), flush=True)
+    print(f"{exp}: elegida lr {lr:g}" + ("" if a is None else f", aux {a:g}"), flush=True)
+    for s in range(3):
+        if not (RUNS / nombre_corrida(exp, lr, s, False, a) / "resultado.json").exists():
+            entrenar(exp, lr, s, aux=a)
 
 
 def reevaluar():
@@ -172,9 +269,7 @@ def reevaluar():
         faltan = [c for c in rgbd.CONDICIONES if c not in out["resultados"]]
         if not faltan:
             continue
-        modelo = rgbd.RGBD(out["fusion"]).to(DEV)
-        info = modelo.load_state_dict(torch.load(ruta.parent / "cabeza.pt", map_location=DEV), strict=False)
-        assert not info.unexpected_keys and all(k.startswith(("evit.backbone", "defm")) for k in info.missing_keys)
+        modelo, _ = cargar(ruta.parent)
         datos = nyuv2.cache("test")
         nuevos = evaluar(modelo, datos, np.arange(len(datos["rgb"])), faltan)
         out["resultados"].update({c: nuevos[c] for c in faltan})
@@ -188,18 +283,23 @@ if __name__ == "__main__":
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--semilla", type=int, default=0)
     ap.add_argument("--epocas", type=int, default=60)
+    ap.add_argument("--aux", type=float, default=None)
     ap.add_argument("--barrido", choices=list(FUSION))
+    ap.add_argument("--completo", choices=list(FUSION), nargs="+")
     ap.add_argument("--humo", action="store_true")
     ap.add_argument("--reevaluar", action="store_true")
     a = ap.parse_args()
     if a.reevaluar:
         reevaluar()
     elif a.humo:
-        for exp in ("E1", "E2", "E4", "E5"):
+        for exp in FUSION:
             entrenar(exp, 1e-3, 0, humo=True)
+    elif a.completo:
+        for exp in a.completo:
+            completo(exp)
     elif a.barrido:
         for lr in LRS:
-            if not (RUNS / f"val_{a.barrido}_lr{lr:g}_s0" / "resultado.json").exists():
+            if not (RUNS / nombre_corrida(a.barrido, lr, 0, True) / "resultado.json").exists():
                 entrenar(a.barrido, lr, 0, epocas=a.epocas, validacion=True)
     else:
-        entrenar(a.exp, a.lr, a.semilla, epocas=a.epocas)
+        entrenar(a.exp, a.lr, a.semilla, epocas=a.epocas, aux=a.aux)

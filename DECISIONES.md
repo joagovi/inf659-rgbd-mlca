@@ -44,6 +44,42 @@ entre las condiciones de evaluación y faltaba definirlo.
   ventaja de diseño frente a él (la «distinción técnica» de la propuesta).
 - **IA.** Propuso la definición y escribió el código; los niveles quedan pendientes de confirmar por el equipo.
 
+## D-03 · Profundidad como maestra (E7) y fusión con respaldo en la salida (E8)
+
+**Fecha** 2026-10-28 · **Estado** 🟡 provisional · **Origen** el equipo, tras E4 y E5: la máscara sola no protege
+a la red (E4 colapsa sin profundidad) y el *dropout* compra robustez con la ganancia (E5). Se registra antes de
+entrenar.
+
+- **Pruebas sin entrenar** (`src/combinar_e1_e2.py`), con los modelos ya entrenados de E1 y E2: interruptor por
+  imagen según la fracción de profundidad válida; mezcla por píxel p = (1 − α)·p_E1 + α·p_E2, con α = fracción
+  válida en una ventana de k×k celdas de 1/8; y relleno de los huecos con el píxel válido más cercano antes de
+  E2. El umbral (0.3, 0.5, 0.7, 0.9) y k (1, 3, 7, 15, 31) se eligen en la validación por escenas con la media
+  de todas las condiciones; el test se evalúa una vez.
+- **E1u**: E1 con la última etapa de EfficientViT («stage4») entrenable, con una lr 10 veces menor que la de la
+  cabeza y BN con sus estadísticas de ADE20K. Es la referencia justa para E7.
+- **E7** (profundidad como maestra; opción (c) de la tesis): E1u más una cabeza auxiliar que predice el log de la
+  profundidad, copia de la cabeza de ADE20K con salida 1 iniciada en cero. Pérdida invariante a la escala de cada
+  imagen (Eigen et al., 2014), porque el aumento amplía la imagen sin cambiar la profundidad. Se descarta al
+  inferir: E7 no usa profundidad en el test. lr = la elegida para E1u; el peso de la pérdida auxiliar (1, 3, 10)
+  se elige en la validación.
+- **E8** (fusión con respaldo en la salida; opción (b′) de la tesis): dos expertos sobre los mismos codificadores
+  congelados, la cabeza de color (como E1) y la de fusión (como E2), mezclados por píxel con
+  α = σ(w·[m₁, m₅, m₁₅] + b)·m₁₅, donde m_k es la fracción válida en una ventana de k celdas (`rgbd.Compuerta`).
+  Sin ninguna medida en la ventana grande, α = 0 y la salida es exactamente la del experto de color (comprobado:
+  diferencia máxima 1e-6 en el log de la probabilidad). Pérdida: mezcla + experto de color + experto de fusión,
+  este último solo en los píxeles con medida, para que no aprenda a prescindir de la profundidad (lo que le pasó
+  a E5). Al entrenar, por muestra: sin profundidad con prob. 0.15, rectángulos de severidad U(0, 1) con prob.
+  0.35 y completa en el resto.
+- **E2h** (control de E8): E2 con la misma corrupción al entrenar, para separar el efecto de la compuerta del de
+  ver huecos al entrenar.
+- **Limitación declarada:** E8 y E2h ven rectángulos al entrenar, así que la condición «regiones» no es nueva
+  para ellos; «cruda», «aleatoria» y «ruido» sí lo son.
+- **Comprobado antes de lanzar:** con el código nuevo, E1 y E2 recargados reproducen sus resultados guardados
+  (45.1702, 47.5440 y 42.3615); en E1u solo la última etapa recibe gradiente.
+- **Predicciones:** E7 y E8 se lanzan sin predicción registrada, a pedido del equipo; se puede registrar antes de
+  abrir los resultados.
+- **IA.** Propuso los diseños y los valores fijados de antemano y escribió el código.
+
 ## Predicciones de E1 y E2 (NYUv2, 40 clases)
 
 Registradas el 2026-10-21 en el repositorio del curso antes de entrenar. Se habían visto `09_mlca_bloque` y
