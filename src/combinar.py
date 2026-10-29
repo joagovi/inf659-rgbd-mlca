@@ -153,7 +153,13 @@ def main():
            "ensamble_color": {"pares": PARES, "miou": control, "media": st.mean(control), "de": st.stdev(control)}}
     carpeta = RUNS / "combinaciones" / f"{a.color}+{a.fusion}"
     carpeta.mkdir(parents=True, exist_ok=True)
-    (carpeta / "resultado.json").write_text(json.dumps(out, indent=1, ensure_ascii=False), encoding="utf-8")
+    archivo = carpeta / "resultado.json"
+    if archivo.exists():            # si cambió la lr elegida (D-05), el resultado anterior se conserva aparte
+        viejo = json.loads(archivo.read_text(encoding="utf-8"))
+        if [viejo["color"], viejo["fusion"]] != [out["color"], out["fusion"]]:
+            (c, l1), (f, l2) = viejo["color"], viejo["fusion"]
+            archivo.rename(carpeta / f"resultado_{c}_lr{l1:g}+{f}_lr{l2:g}.json")
+    archivo.write_text(json.dumps(out, indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"{'condición':14s}" + "".join(f"{v:>16s}" for v in variantes))
     for c, fila in tabla.items():
         print(f"{c:14s}" + "".join(f"{st.mean(x):10.2f} ±{st.stdev(x):4.2f}" for x in fila.values()))

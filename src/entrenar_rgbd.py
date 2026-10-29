@@ -9,16 +9,19 @@ profundidad (`rgbd.CONDICIONES`).
     python src/entrenar_rgbd.py --reevaluar                  # condiciones nuevas en modelos ya entrenados
 
 Protocolo, igual para todos los experimentos:
-- Encoders congelados; se entrenan la fusión y la cabeza de EfficientViT (`rgbd.RGBD`). En E1u, E7, E2u y E9
-  también la última etapa del codificador de color, con una lr 10 veces menor (D-03, D-04). En E9 el experto de
-  color es el E1u ya entrenado de la misma semilla (en la validación, el de la validación), congelado (D-04).
+- Encoders congelados; se entrenan la fusión y la cabeza de EfficientViT (`rgbd.RGBD`). En E1u, E7, E2u, E9,
+  E10 y E11 también la última etapa del codificador de color, con una lr 10 veces menor (D-03, D-04, D-05). En E9
+  el experto de color es el E1u ya entrenado de la misma semilla (en la validación, el de la validación),
+  congelado (D-04). E10 es E2u con rasgos de profundidad que dependen de la entrada en las tres escalas, y E11,
+  E10 con la profundidad también a la entrada de la última etapa del color (D-05).
 - Entrenamiento con la profundidad rellenada (`depths`); en E5, el 30 % de las muestras sin profundidad; en E8,
   E2h y E9, huecos por muestra (`rgbd.huecos_entrenamiento`). Aumento en la GPU: escala U(1, 1.5) con recorte
   aleatorio de 480×640 y volteo horizontal.
 - AdamW (decaimiento 0.01), lote 8, 100 pasos de calentamiento y caída polinómica (0.9); bf16.
 - Sin selección de época: se evalúa el modelo final. La lr se elige en una validación del 15 % de las escenas de
   entrenamiento (`nyuv2.validacion_por_escenas`), nunca en el test. En E7 se usa la lr elegida para E1u y se
-  elige así el peso de la pérdida auxiliar.
+  elige así el peso de la pérdida auxiliar. En E2u, E10 y E11, si la mejor lr queda en un extremo del barrido,
+  se prueba la siguiente de `ESCALA_LR` hacia ese lado, hasta que la mejor quede dentro (D-05).
 - mIoU sobre las 40 clases a 480×640, ignorando «sin etiqueta».
 
 Cada corrida deja en runs/rgbd/<nombre>/ resultado.json y cabeza.pt (solo lo entrenado).
@@ -43,14 +46,18 @@ import efficientvit_seg as sg  # noqa: E402
 RUNS = sg.RAIZ / "runs" / "rgbd"
 FUSION = {"E1": "rgb", "E2": "concat", "E4": "mlca", "E5": "mlca",
           "E1u": "rgb", "E7": "rgb", "E8": "respaldo", "E2h": "concat",
-          "E2u": "concat", "E9": "respaldo"}
+          "E2u": "concat", "E9": "respaldo", "E10": "concat", "E11": "concat"}
 DROPOUT = {"E5": 0.3}       # modality dropout: proporción de muestras que se entrenan sin ninguna profundidad
 HUECOS = {"E8", "E2h", "E9"}    # huecos al entrenar (rgbd.huecos_entrenamiento); E2h es el control de E8
-ENTRENABLE = {e: ("stage4",) for e in ("E1u", "E7", "E2u", "E9")}   # etapas del codificador de color que se ajustan
+ENTRENABLE = {e: ("stage4",) for e in ("E1u", "E7", "E2u", "E9", "E10", "E11")}   # etapas del color que se ajustan
 FIJO = {"E9": "E1u"}        # experto de color ya entrenado y congelado (D-04)
+RASGOS = {"E10": "c3p4c5", "E11": "c3p4c5"}    # rasgos de DeFM que dependen de la entrada en 1/8 y 1/32 (D-05)
+CODIFICADOR = {"E11"}       # la profundidad entra también en el codificador de color (D-05)
 FACTOR_COD = 0.1            # lr de esas etapas = 0.1 × la de la cabeza
 AUX = {"E7": (1.0, 3.0, 10.0)}   # pesos de la pérdida auxiliar de profundidad que se barren en la validación
 LRS = (3e-4, 1e-3, 3e-3)
+ESCALA_LR = (1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2)
+BORDE = {"E2u", "E10", "E11"}   # si la mejor lr queda en un extremo, se prueba la siguiente (D-05)
 DEV = "cuda"
 IGNORAR = 255
 
@@ -113,7 +120,8 @@ def perdida_prof(pred, prof):
 
 def construir(exp):
     return rgbd.RGBD(FUSION[exp], entrenable=ENTRENABLE.get(exp, ()), aux_prof=exp in AUX,
-                     experto_fijo=exp in FIJO).to(DEV)
+                     experto_fijo=exp in FIJO, rasgos_prof=RASGOS.get(exp, "p3p4p5"),
+                     codificador=exp in CODIFICADOR).to(DEV)
 
 
 def experto_de(exp, semilla, validacion):
@@ -272,6 +280,15 @@ def completo(exp):
     for lr, a in opciones:
         if not (RUNS / nombre_corrida(exp, lr, 0, True, a) / "resultado.json").exists():
             entrenar(exp, lr, 0, validacion=True, aux=a)
+    while exp in BORDE:                 # D-05: la mejor lr no puede quedar en un extremo del barrido
+        (lr, _), val = elegida(exp)
+        probadas, i = sorted(l for l, _ in val), ESCALA_LR.index(lr)
+        if lr == probadas[-1] and i + 1 < len(ESCALA_LR):
+            entrenar(exp, ESCALA_LR[i + 1], 0, validacion=True)
+        elif lr == probadas[0] and i > 0:
+            entrenar(exp, ESCALA_LR[i - 1], 0, validacion=True)
+        else:
+            break
     (lr, a), val = elegida(exp)
     print(f"{exp}: validación " + ", ".join(f"lr {l:g}{'' if x is None else f' aux {x:g}'}: {v:.2f}"
                                             for (l, x), v in sorted(val.items(), key=str)), flush=True)

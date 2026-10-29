@@ -14,14 +14,26 @@ DeFM (`09_mlca_bloque` §2.2):
   cerca, la compuerta vale 0 y la salida es exactamente la del experto de color (D-03). Con `experto_fijo`
   (E9), el experto de color es un E1u ya entrenado, con su última etapa y su cabeza congeladas (D-04).
 
+Qué rasgos de profundidad (D-05): en los pesos publicados de DeFM ResNet-18, P3 y P5 no dependen de la entrada
+(las convoluciones de salida de la BiFPN para esos niveles tienen pesos de ~1e-9, y en P5 también los pesos de
+fusión son 0): hasta E9, solo P4 (1/16) lleva información de la profundidad, y en 1/8 y 1/32 la fusión suma una
+constante. Con `rasgos_prof="c3p4c5"` (E10, E11), en 1/8 y 1/32 se usan las etapas del ResNet de DeFM (C3, C5),
+normalizadas por posición sin parámetros, como DeFM hace con sus salidas densas; en 1/16 sigue P4.
+
+Dónde entra la profundidad (D-05): en todas, en los rasgos que lee la cabeza, después del codificador de color
+(que nunca la ve). Con `codificador` (E11, solo `concat`), la última etapa del color lee además f_1/16 + W'·P4,
+con W' propia (1×1, iniciada en cero), como la rectificación de CMX antes de la etapa siguiente; con W' = 0 es la
+misma red que sin ella.
+
 Opciones que no dependen de la fusión (D-03): `entrenable` deja ajustar etapas del codificador de color (E1u,
-E7, E2u, E9), y `aux_prof` añade una cabeza que predice la profundidad solo para entrenar (E7).
+E7, E2u, E9, E10, E11), y `aux_prof` añade una cabeza que predice la profundidad solo para entrenar (E7).
 
 También las condiciones de evaluación de la profundidad (propuesta §7; D-01). Uso de IA: escrito con asistencia
 de IA (Claude, Anthropic); ver `DECISIONES.md`.
 """
 import copy
 import math
+from collections import OrderedDict
 
 import numpy as np
 import torch
@@ -34,6 +46,8 @@ from mlca import MLCA, validez_a_rasgos
 DEFM_MEAN = torch.tensor([0.248880, 0.495620, 0.492858]).view(1, 3, 1, 1)   # defm/utils/utils.py
 DEFM_STD = torch.tensor([0.139357, 0.271314, 0.297177]).view(1, 3, 1, 1)
 PARES = [("stage2", "P3"), ("stage3", "P4"), ("stage4", "P5")]           # color y profundidad a la misma escala
+RASGOS_PROF = {"p3p4p5": PARES, "c3p4c5": [("stage2", "C3"), ("stage3", "P4"), ("stage4", "C5")]}   # D-05
+CANALES_PROF = {"P3": 128, "P4": 128, "P5": 128, "C3": 128, "C5": 512}
 
 
 def entrada_defm(prof_m, valida):
@@ -60,6 +74,20 @@ def entrada_defm(prof_m, valida):
 def cargar_defm():
     return torch.hub.load("leggedrobotics/defm:main", "defm_resnet18", pretrained=True, trust_repo=True,
                           verbose=False)
+
+
+def rasgos_defm(defm, prof_m, valida, cuales="p3p4p5"):
+    """Rasgos densos de DeFM para la fusión. «p3p4p5»: las salidas de su BiFPN (`dense_bifpn`), como hasta D-04.
+    «c3p4c5» (D-05): C3 y C5 del ResNet, con LayerNorm por posición sin parámetros, y P4 de la BiFPN, calculados
+    en una sola pasada como en `ResNetBiFPN.forward` del código oficial."""
+    x = entrada_defm(prof_m, valida)
+    if cuales == "p3p4p5":
+        return defm(x)["dense_bifpn"]
+    c = OrderedDict(defm.backbone(x).items())
+    por_posicion = lambda t, ln: ln(t.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)   # noqa: E731
+    sin_param = lambda t: F.layer_norm(t, t.shape[-1:])                          # noqa: E731
+    return {"C3": por_posicion(c["c3"], sin_param), "P4": por_posicion(defm.fpn(c)["c4"], defm.norm_patch),
+            "C5": por_posicion(c["c5"], sin_param)}
 
 
 def nueva_cabeza(cabeza, n):
@@ -99,10 +127,14 @@ class Compuerta(nn.Module):
 
 
 class RGBD(nn.Module):
-    def __init__(self, fusion="rgb", n_clases=40, entrenable=(), aux_prof=False, experto_fijo=False):
+    def __init__(self, fusion="rgb", n_clases=40, entrenable=(), aux_prof=False, experto_fijo=False,
+                 rasgos_prof="p3p4p5", codificador=False):
         super().__init__()
-        self.fusion, self.entrenable = fusion, tuple(entrenable)
+        self.fusion, self.entrenable, self.codificador = fusion, tuple(entrenable), codificador
+        self.rasgos_prof, self.pares = rasgos_prof, RASGOS_PROF[rasgos_prof]
         self.etapa4_rgb = None
+        if codificador and fusion != "concat":
+            raise ValueError("codificador solo con la fusión «concat»")
         self.evit = S.cargar_efficientvit("b1", "ade20k")
         cabeza_ade = self.evit.head                                      # clasificador 64 -> 150 de ADE20K
         self.evit.head = nueva_cabeza(cabeza_ade, n_clases)
@@ -121,9 +153,13 @@ class RGBD(nn.Module):
         else:
             self.defm = cargar_defm().requires_grad_(False)
             if fusion in ("concat", "respaldo"):
-                self.fus = nn.ModuleDict({c: nn.Conv2d(128, c_rgb[c], 1, bias=False) for c, _ in PARES})
+                self.fus = nn.ModuleDict({c: nn.Conv2d(CANALES_PROF[d], c_rgb[c], 1, bias=False)
+                                          for c, d in self.pares})
                 for m in self.fus.values():
                     nn.init.zeros_(m.weight)
+                if codificador:             # E11: W' de la profundidad de 1/16 a la entrada de la última etapa
+                    self.fus_cod = nn.Conv2d(CANALES_PROF["P4"], c_rgb["stage3"], 1, bias=False)
+                    nn.init.zeros_(self.fus_cod.weight)
                 if fusion == "respaldo":                                # experto de color y compuerta
                     self.cabeza_rgb = nueva_cabeza(cabeza_ade, n_clases)
                     self.compuerta = Compuerta()
@@ -131,7 +167,7 @@ class RGBD(nn.Module):
                         self.etapa4_rgb = copy.deepcopy(self.evit.backbone.stages[3]).requires_grad_(False)
                         self.cabeza_rgb.requires_grad_(False)
             elif fusion == "mlca":
-                self.fus = nn.ModuleDict({c: MLCA(c_rgb[c], 128, cabezas=4) for c, _ in PARES})
+                self.fus = nn.ModuleDict({c: MLCA(c_rgb[c], CANALES_PROF[d], cabezas=4) for c, d in self.pares})
             else:
                 raise ValueError(fusion)
         if experto_fijo and self.etapa4_rgb is None:
@@ -167,28 +203,35 @@ class RGBD(nn.Module):
         assert all(k.startswith("etapa4_rgb.") and k.endswith(("running_mean", "running_var", "num_batches_tracked"))
                    for k in faltan), faltan
 
-    def color(self, rgb_norm):
-        """Rasgos de EfficientViT por etapas, como `backbone.forward`; solo las de `entrenable` llevan gradiente."""
+    def etapa(self, i, x):
+        """Etapa i (1-4) del codificador de color; solo las de `entrenable` llevan gradiente."""
+        with torch.set_grad_enabled(torch.is_grad_enabled() and f"stage{i}" in self.entrenable):
+            return self.evit.backbone.stages[i - 1](x)
+
+    def color(self, rgb_norm, etapas=4):
+        """Rasgos de EfficientViT por etapas, como `backbone.forward`, hasta la etapa `etapas`."""
         bb = self.evit.backbone
         with torch.no_grad():
             f = {"input": rgb_norm, "stage0": bb.input_stem(rgb_norm)}
         x = f["stage0"]
-        for i, etapa in enumerate(bb.stages, 1):
-            with torch.set_grad_enabled(torch.is_grad_enabled() and f"stage{i}" in self.entrenable):
-                f[f"stage{i}"] = x = etapa(x)
+        for i in range(1, etapas + 1):
+            f[f"stage{i}"] = x = self.etapa(i, x)
         f["stage_final"] = x
         return f
 
     def forward(self, rgb_norm, prof_m=None, valida=None, todo=False):
         """Logits (B, 40, H/8, W/8). Con `todo`, un diccionario con «seg» y, según el modelo, «rgb», «fus»,
         «alfa» (E8) o «prof» (E7). En E8 «seg» es el logaritmo de la mezcla de probabilidades."""
-        f = self.color(rgb_norm)
+        f = self.color(rgb_norm, 3 if self.codificador else 4)
         g = f
         if self.defm is not None:
             with torch.no_grad():
-                fd = self.defm(entrada_defm(prof_m, valida))["dense_bifpn"]
+                fd = rasgos_defm(self.defm, prof_m, valida, self.rasgos_prof)
+            if self.codificador:            # E11: la última etapa del color también lee la profundidad
+                x = f["stage3"] + self.fus_cod(fd["P4"].to(f["stage3"].dtype))
+                f["stage4"] = f["stage_final"] = self.etapa(4, x)
             g = dict(f)
-            for c, d in PARES:
+            for c, d in self.pares:
                 if self.fusion == "mlca":
                     m = validez_a_rasgos(valida, f[c].shape[-2:])
                     g[c] = self.fus[c](f[c], fd[d].to(f[c].dtype), m)

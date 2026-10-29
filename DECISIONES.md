@@ -112,6 +112,45 @@ cabezas. Se registra antes de entrenar.
 - **IA.** Encontró las dos confusiones (ajuste y ensamble), propuso los controles y los diseños, y escribió el
   código.
 
+## D-05 · P3 y P5 de DeFM son constantes; E10 y E11
+
+**Fecha** 2026-10-29 · **Estado** 🟡 provisional · **Origen** los diagnósticos de D-04 (al final de este archivo).
+Se registra antes de entrenar.
+
+- **Hallazgo.** En los pesos publicados de DeFM ResNet-18 (`leggedrobotics/defm`, `defm_resnet18`), las salidas
+  P3 y P5 de la BiFPN (`dense_bifpn`) no dependen de la entrada: las convoluciones de salida de esos niveles
+  (`fpn.blocks.0.convs.0` y `.2`) tienen pesos de norma 1.3e-9, y en P5 también los pesos de fusión
+  (`fuse_bottomup.1`) son 0. Entre dos imágenes distintas, P3 cambia 4e-10 (relativo), P5 nada y P4 0.98. **Hasta
+  E9, la profundidad solo entró en 1/16;** en 1/8 y 1/32 la fusión sumó una constante aprendida. En MLCA (E4, E5)
+  también: la atención sobre claves y valores constantes da una constante. Afecta a todo uso de `dense_bifpn` de
+  DeFM ResNet-18. El repositorio de DeFM todavía no publica cómo hace la segmentación (`segmentation/` figura como
+  TODO en su README).
+- **E10**: E2u con rasgos que dependen de la entrada en las tres escalas. En 1/8 y 1/32, las etapas del ResNet de
+  DeFM (C3, 128 canales; C5, 512) con LayerNorm por posición sin parámetros (DeFM normaliza así sus salidas
+  densas, con parámetros); en 1/16, P4, como hasta ahora (`rgbd.rasgos_defm`). Lo demás, como E2u; +98 k
+  parámetros entrenables, porque la W de 1/32 pasa de 128 a 512 entradas.
+- **E11** (dónde entra la profundidad): E10 con la profundidad también dentro del codificador de color. La última
+  etapa lee f_1/16 + W'·P4, con W' propia (1×1, iniciada en cero), como la rectificación de CMX antes de la etapa
+  siguiente. Las sumas que lee la cabeza no cambian; con W' = 0 es E10; +16 k parámetros.
+- **Cómo se evalúan:** solos, en todas las condiciones, y con E1u de respaldo (`combinar.py`, la misma selección
+  en la validación), frente a E1u + E2u (49.70) y al control E1u + E1u (48.50).
+- **Barrido de lr:** E2u eligió 3e-3 con la validación todavía subiendo (45.34 / 46.93 / 47.76). En E2u, E10 y E11,
+  si la mejor lr queda en un extremo, se prueba la siguiente de (1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2) hacia ese
+  lado, hasta que quede dentro. Si E2u cambia de lr, se repiten sus 3 semillas y E1u + E2u; el resultado anterior
+  se conserva (`combinar.py` lo guarda aparte).
+- **Comprobado antes de lanzar:** con el código nuevo, E1u, E2, E2u, E4 y E9 reproducen sus resultados guardados
+  (semilla 0; por ejemplo, E2u 48.6364 con profundidad completa y 36.6998 sin ella, E4 45.5647 y 45.1796 con la
+  cruda); el P4 de `rasgos_defm` es idéntico al de `dense_bifpn`; C3 y C5 cambian con la imagen (1.18 y 0.93,
+  relativo); E10 y E11 recién construidos dan la misma salida que E2u, y E11 con W' = 0 la misma que E10; solo
+  reciben gradiente la última etapa del color, la fusión (y W' en E11) y la cabeza.
+- **Orden:** E2u (extremo del barrido) → E10 → E1u + E10 → E11 → E1u + E11 → E1u + E2u, si E2u cambió de lr.
+- **Para después:** E4 y E5 (MLCA) con los rasgos de E10, si el equipo mantiene MLCA en el informe; módulos del
+  estado del arte en la ubicación que gane; una compuerta aprendida, solo con datos que los expertos no hayan visto
+  (resultados de D-04).
+- **Predicciones:** se pueden registrar antes de abrir los resultados.
+- **IA.** Encontró las salidas constantes de DeFM con la prueba de la profundidad de otra imagen, propuso E10 y
+  E11 y escribió el código.
+
 ## Predicciones de E1 y E2 (NYUv2, 40 clases)
 
 Registradas el 2026-10-21 en el repositorio del curso antes de entrenar. Se habían visto `09_mlca_bloque` y
@@ -223,3 +262,65 @@ todas las condiciones.
   completa (47.31 con el 10, el 30 y el 50 %). Las que separan los métodos son «regiones», «cruda» y «sin».
 
 Siguiente paso: D-04.
+
+## Resultados de D-04 (E2u, E9 y pruebas sin entrenar con E1u + E2u)
+
+Medido el 2026-10-29 (test, 3 semillas). No se registró predicción. Elegido en la validación por escenas: E2u lr
+3e-3 (45.34 / 46.93 / 47.76 con 3e-4 / 1e-3 / 3e-3: extremo superior del barrido, todavía subiendo); E9 lr 3e-4
+(45.96 / 45.85 / 45.55: extremo inferior, casi plano); pruebas sin entrenar, con E1u + E2u y con E1 + E2: umbral
+0.7, mezcla con ventana 15 y tope 0.6 (la ventana casi no importa: 46.93 en la validación con 1, 3, 7, 15 o 31) y
+relleno con a = 0.5.
+
+| Modelo | completa | cruda | aleatoria 10 / 30 / 50 % | regiones | sin | ruido 10 / 20 / 50 cm |
+|---|---|---|---|---|---|---|
+| E1u (referencia) | 47.31 ± 0.10 | igual | igual | igual | igual | igual |
+| E2u | 48.59 ± 0.15 | 47.71 | 47.89 / 44.94 / 43.90 | 47.72 | 36.84 ± 0.70 | 47.88 / 47.12 / 45.47 |
+| E9 | 47.76 ± 0.09 | 47.72 | 47.75 / 47.64 / 47.57 | 47.73 | 47.31 ± 0.10 | 47.74 / 47.71 / 47.65 |
+| E1u + E1u (control) | 48.50 ± 0.08 | igual | igual | igual | igual | igual |
+| Interruptor E1u/E2u | 48.52 ± 0.14 | 47.58 | 47.84 / 46.16 / 47.27 | 47.67 | 47.27 ± 0.10 | 47.83 / 47.07 / 45.44 |
+| Mezcla E1u/E2u | 49.70 ± 0.07 | 49.24 | 49.31 / 48.08 / 47.82 | 49.41 | 47.27 ± 0.10 | 49.22 / 48.71 / 47.61 |
+| Relleno + E1u/E2u | 49.71 ± 0.01 | 49.64 | 49.71 / 49.72 / 49.72 | 49.55 | 45.55 ± 0.11 | 49.37 / 48.99 / 48.21 |
+| E1 + E1 (control) | 46.60 ± 0.12 | igual | igual | igual | igual | igual |
+| Mezcla E1/E2 | 47.63 ± 0.32 | 47.01 | 47.24 / 46.25 / 45.76 | 47.20 | 44.97 ± 0.30 | 47.33 / 47.09 / 46.53 |
+| Relleno + E1/E2 | 47.31 ± 0.33 | 47.28 | 47.31 / 47.31 / 47.31 | 47.22 | 45.54 ± 0.36 | 47.10 / 46.92 / 46.48 |
+
+Las pruebas sin entrenar promedian probabilidades: ahí E1u da 47.27 y E1 44.97 (con logits, 47.31 y 44.99). Los
+controles no usan profundidad. La desviación entre semillas no pasa de 0.70 (E2u sin profundidad).
+
+**Diagnósticos** (exploratorios, sobre el test salvo donde se dice; `src/diagnosticos_d04.py`; no sirven para
+elegir modelos):
+
+- **La profundidad sobre el ajuste, en un solo modelo.** E2u − E1u = +1.28 con profundidad completa (+1.37, +1.00
+  y +1.46 por semilla), frente a +2.32 de E2 sobre E1 con el color congelado. Sin profundidad, E2u cae a 36.84
+  (E2: 42.25): ajustar el color junto con la profundidad lo hace más dependiente de ella.
+- **Por clase.** E2u supera a E1u en 30 de 40 clases, sobre todo en clases de forma (cojín +4.7, techo +3.6,
+  inodoro +3.3, piso +3.1, silla +2.6, cama +2.3), y pierde donde el ajuste del color había ganado más (cómoda
+  −4.9, refrigerador −4.2, puerta −1.9): en cómoda, E2u (50.8) queda como E2 (50.7) y no como E1u (55.6).
+  Correlación entre E2u − E1u y E1u − E1: −0.60. La pizarra (+8.8) es inestable: E1u y E2 pierden 7.0 y 11.2
+  sobre E1.
+- **La cifra para la propuesta es la mezcla E1u + E2u:** 49.70 ± 0.07 con profundidad completa, +1.20 sobre el
+  control E1u + E1u y +2.43 sobre E1u, con tope y ventana elegidos en la validación (la cifra de 0.8 de D-03 se
+  eligió en el test). Sin profundidad es E1u. Supera al control con profundidad completa, cruda, por regiones,
+  con el 10 % de huecos aleatorios y con ruido de 10 y 20 cm; queda por debajo con el 30 y el 50 % de huecos
+  aleatorios, sin profundidad y con ruido de 50 cm, sin bajar nunca de E1u. El relleno supera al control con
+  todos los huecos (49.55 a 49.72), pero no sin profundidad (45.55: no hay de dónde rellenar) ni con ruido de
+  50 cm. Coste: E1u y E2u comparten el tronco congelado (entrada y etapas 1 a 3), así que la mezcla es una pasada
+  del tronco, dos últimas etapas, dos cabezas y DeFM: la misma red que E9. El control es lo mismo sin DeFM ni
+  fusión.
+- **E9 deja sin usar la profundidad que tiene.** Su compuerta vale en media 0.14 con profundidad completa (E8:
+  0.59). Su experto de fusión solo da 47.76, y con los mismos dos expertos y α fijo = 0.6 · m_15 la mezcla daría
+  48.84 (+1.1 sobre E9). En la validación pasa lo mismo, y peor cuanto mayor es la lr: α medio 0.18 / 0.09 /
+  0.015 con 3e-4 / 1e-3 / 3e-3, aunque el experto de fusión supera al de color con 1e-3 y 3e-3 (46.79 y 45.96
+  frente a 45.39) y el α fijo daría 46.33 / 47.32 / 48.13. La causa está en las imágenes de entrenamiento, que
+  es donde se ajusta la compuerta: ahí el experto de color (E1u, entrenado 60 épocas con ellas) da 86.25 y el de
+  fusión 75.69, y lo correcto es confiar en el color. Una compuerta aprendida necesita datos que los expertos no
+  hayan visto, como el apilamiento (Wolpert, 1992); la mezcla sin entrenar elige su tope en la validación por
+  escenas.
+- **Escalas de la fusión.** Las sumas W·f_prof no son correcciones pequeñas: su norma, relativa a la del rasgo
+  de color, es 0.85 / 0.66 / 1.40 en E2 y 9.3 / 1.53 / 2.79 en E2u (1/8, 1/16, 1/32). Quitar la de 1/8 o la de
+  1/32 hunde a E2u (5.3 y 1.0), y quitar las tres deja a E2 en 9.3 y a E2u en 0.9: la cabeza se ajustó a
+  recibirlas. Pero con la profundidad de otra imagen del test en 1/8 o en 1/32 el mIoU no cambia ni en el tercer
+  decimal; en 1/16 cae de 47.31 a 42.49 (E2) y de 48.59 a 40.47 (E2u). La causa, en D-05: en los pesos publicados
+  de DeFM ResNet-18, P3 y P5 son constantes.
+
+Siguiente paso: D-05.
