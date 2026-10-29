@@ -324,3 +324,65 @@ elegir modelos):
   de DeFM ResNet-18, P3 y P5 son constantes.
 
 Siguiente paso: D-05.
+
+## Resultados de D-05 (E10, E11 y pruebas sin entrenar con E1u)
+
+Medido el 2026-10-29 (test, 3 semillas). No se registró predicción. Elegido en la validación por escenas: E2u
+sigue en 3e-3 (con 1e-2, 36.36), así que su resultado y E1u + E2u no cambian; E10 lr 1e-3 (45.45 / 46.76 / 46.41
+con 3e-4 / 1e-3 / 3e-3); E11 lr 3e-3 (47.13 / 47.05 / 48.62 / 42.97 con 3e-4 / 1e-3 / 3e-3 / 1e-2); pruebas sin
+entrenar, con E1u + E10 y con E1u + E11: umbral 0.9, mezcla con tope 0.5 (ventana 7 y 15; otra vez, la ventana
+casi no importa) y relleno con a = 0.5.
+
+| Modelo | completa | cruda | aleatoria 10 / 30 / 50 % | regiones | sin | ruido 10 / 20 / 50 cm |
+|---|---|---|---|---|---|---|
+| E1u (referencia) | 47.31 ± 0.10 | igual | igual | igual | igual | igual |
+| E2u (referencia) | 48.59 ± 0.15 | 47.71 | 47.89 / 44.94 / 43.90 | 47.72 | 36.84 ± 0.70 | 47.88 / 47.12 / 45.47 |
+| E10 | 49.24 ± 0.24 | 48.10 | 48.39 / 45.04 / 43.13 | 48.17 | 39.15 ± 1.43 | 48.13 / 47.19 / 45.25 |
+| E11 | 51.06 ± 0.16 | 47.71 | 48.48 / 39.46 / 33.39 | 49.19 | 15.75 ± 1.21 | 47.73 / 45.40 / 39.54 |
+| E1u + E1u (control) | 48.50 ± 0.08 | igual | igual | igual | igual | igual |
+| Mezcla E1u/E2u (referencia) | 49.70 ± 0.07 | 49.24 | 49.31 / 48.08 / 47.82 | 49.41 | 47.27 ± 0.10 | 49.22 / 48.71 / 47.61 |
+| Interruptor E1u/E10 | 49.17 ± 0.24 | 47.27 | 47.72 / 47.27 / 47.27 | 47.78 | 47.27 ± 0.10 | 48.07 / 47.14 / 45.22 |
+| Mezcla E1u/E10 | 49.36 ± 0.15 | 48.87 | 48.90 / 47.74 / 47.45 | 48.90 | 47.27 ± 0.10 | 48.91 / 48.45 / 47.54 |
+| Relleno + E1u/E10 | 49.36 ± 0.15 | 49.19 | 49.37 / 49.39 / 49.39 | 49.15 | 45.98 ± 0.19 | 48.91 / 48.45 / 47.54 |
+| Interruptor E1u/E11 | 50.98 ± 0.17 | 47.27 | 47.65 / 47.27 / 47.27 | 48.57 | 47.27 ± 0.10 | 47.66 / 45.35 / 39.52 |
+| Mezcla E1u/E11 | 52.12 ± 0.25 | 50.15 | 50.52 / 48.16 / 47.56 | 50.96 | 47.27 ± 0.10 | 50.46 / 49.39 / 47.04 |
+| Relleno + E1u/E11 | 52.12 ± 0.25 | 51.69 | 52.13 / 52.14 / 52.12 | 51.88 | 42.91 ± 0.42 | 50.46 / 49.39 / 47.04 |
+
+Las pruebas sin entrenar promedian probabilidades: ahí E10 da 49.17 y E11 50.98 (con logits, 49.24 y 51.06). La
+desviación entre semillas no pasa de 1.43 (E10 sin profundidad).
+
+**Diagnósticos** (exploratorios, sobre el test; `src/diagnosticos_d05.py`; no sirven para elegir modelos):
+
+- **Con los rasgos corregidos, las tres escalas llevan información (E10).** Con la profundidad de otra imagen en
+  una sola escala, E10 pierde 0.42 / 1.41 / 3.15 en 1/8 / 1/16 / 1/32 (media de las 3 semillas), y 8.68 en las
+  tres (E2u, en D-04: 0 / 8.12 / 0). Las sumas ya no son grandes frente al color: 0.42 / 0.61 / 0.27 (E2u: 9.3 /
+  1.53 / 2.79).
+- **E10 suma poco sobre E2u.** +0.65 con profundidad completa (+0.47, +0.67 y +0.81 por semilla). Mejora en 32
+  de 40 clases y recupera las que E2u había perdido frente a E1u: cómoda 50.8 → 56.3 (E1u 55.6) y refrigerador
+  59.6 → 64.5 (E1u 63.8). La pizarra cae 8.6 (inestable, D-04).
+- **La profundidad dentro del codificador es lo que más suma (E11).** E11 − E10 = +1.82 (+1.69 a +1.96 por
+  semilla) con 16 k parámetros más, y E11 supera a E10 en la validación con las tres lr comunes (+1.68, +0.29 y
+  +2.21 con 3e-4, 1e-3 y 3e-3). Sobre E1u, +3.75. Por clase, E11 − E10 es positivo en 33 de 40 (televisor +7.8,
+  cómoda +7.4, mesa de noche +6.5, bañera, cama y otros muebles +4.2, mesa +4.1, espejo +3.9) y no se parece a la
+  ganancia de la fusión en la cabeza (correlación con E2u − E1u: 0.01).
+- **En E11, la profundidad se usa sobre todo dentro del codificador.** Con la profundidad de otra imagen solo a la
+  entrada de la última etapa del color, E11 cae de 51.06 a 31.09; solo en las tres sumas de la cabeza, a 47.01;
+  en las dos, a 21.81. W'·P4 mide 0.89 del rasgo de color de 1/16 al que se suma.
+- **El costo: E11 necesita una profundidad limpia.** Con la profundidad cruda del sensor (huecos reales) cae a
+  47.71, lo mismo que E2u y menos que E10 (48.10); con ruido de 10 cm, a 47.73; sin profundidad, a 15.75. La
+  caída sin profundidad viene sobre todo del codificador: con la profundidad vacía solo ahí, 25.71; solo en la
+  cabeza, 42.74. E11, como E2u y E10, se entrenó siempre con la profundidad rellenada.
+- **Con E1u de respaldo.** La mezcla E1u/E11 da 52.12 ± 0.25 con profundidad completa: +3.62 sobre el control y
+  +2.42 sobre E1u/E2u; sin profundidad es E1u. Con la cruda da 50.15 (E1u/E2u: 49.24). El relleno recupera los
+  huecos (cruda 51.69, aleatoria 52.1, regiones 51.88), pero sin profundidad no hay de dónde rellenar (42.91).
+  Ninguna variante protege del ruido, que la máscara no ve: con 50 cm, 47.04, 0.23 por debajo de E1u.
+- **Por qué E1u/E10 suma tan poco.** Con profundidad completa, promediar con E1u añade a E10 solo 0.19 (49.17 →
+  49.36), frente a 1.18 en E2u y 1.14 en E11. `combinar.py` empareja modelos de la misma semilla, que ven las
+  imágenes en el mismo orden y con el mismo aumento, y E10 usa la misma lr que E1u (1e-3): su última etapa se
+  aleja de ADE20K lo mismo (0.053 frente a 0.055; con 3e-3, 0.105 en E2u y 0.104 en E11), y E10 coincide con su
+  E1u en el 86.6 % de los píxeles, más que dos E1u de semillas distintas entre sí (85.7 %; E2u 83.6 %, E11 80.9 %).
+  Con el E1u de la semilla siguiente, el promedio 0.5 / 0.5 da 50.07 con E10, 50.00 con E2u y 52.24 con E11 (con
+  la misma semilla: 49.36, 49.71 y 52.12). Las cifras de la tabla siguen el protocolo fijado; la de E10 se queda
+  corta frente a lo que da su mezcla.
+
+Siguiente paso: por decidir (D-06).
