@@ -2,17 +2,18 @@
 """Entrena los experimentos de la propuesta RGB-D en NYUv2 (40 clases) y los evalúa en cada condición de la
 profundidad (`rgbd.CONDICIONES`).
 
-    python src/entrenar_rgbd.py --humo                       # unos pasos y 20 imágenes: que todo corre
+    python src/entrenar_rgbd.py --humo [E2u E9]              # unos pasos y 20 imágenes: que todo corre
     python src/entrenar_rgbd.py --barrido E1                 # lr en la validación por escenas, semilla 0
     python src/entrenar_rgbd.py --exp E1 --lr 1e-3 --semilla 0   # con las 795, evaluación en el test
     python src/entrenar_rgbd.py --completo E8                # barrido, elección y 3 semillas
     python src/entrenar_rgbd.py --reevaluar                  # condiciones nuevas en modelos ya entrenados
 
 Protocolo, igual para todos los experimentos:
-- Encoders congelados; se entrenan la fusión y la cabeza de EfficientViT (`rgbd.RGBD`). En E1u y E7 también la
-  última etapa del codificador de color, con una lr 10 veces menor (D-03).
-- Entrenamiento con la profundidad rellenada (`depths`); en E5, el 30 % de las muestras sin profundidad; en E8 y
-  E2h, huecos por muestra (`rgbd.huecos_entrenamiento`). Aumento en la GPU: escala U(1, 1.5) con recorte
+- Encoders congelados; se entrenan la fusión y la cabeza de EfficientViT (`rgbd.RGBD`). En E1u, E7, E2u y E9
+  también la última etapa del codificador de color, con una lr 10 veces menor (D-03, D-04). En E9 el experto de
+  color es el E1u ya entrenado de la misma semilla (en la validación, el de la validación), congelado (D-04).
+- Entrenamiento con la profundidad rellenada (`depths`); en E5, el 30 % de las muestras sin profundidad; en E8,
+  E2h y E9, huecos por muestra (`rgbd.huecos_entrenamiento`). Aumento en la GPU: escala U(1, 1.5) con recorte
   aleatorio de 480×640 y volteo horizontal.
 - AdamW (decaimiento 0.01), lote 8, 100 pasos de calentamiento y caída polinómica (0.9); bf16.
 - Sin selección de época: se evalúa el modelo final. La lr se elige en una validación del 15 % de las escenas de
@@ -41,10 +42,12 @@ import efficientvit_seg as sg  # noqa: E402
 
 RUNS = sg.RAIZ / "runs" / "rgbd"
 FUSION = {"E1": "rgb", "E2": "concat", "E4": "mlca", "E5": "mlca",
-          "E1u": "rgb", "E7": "rgb", "E8": "respaldo", "E2h": "concat"}
+          "E1u": "rgb", "E7": "rgb", "E8": "respaldo", "E2h": "concat",
+          "E2u": "concat", "E9": "respaldo"}
 DROPOUT = {"E5": 0.3}       # modality dropout: proporción de muestras que se entrenan sin ninguna profundidad
-HUECOS = {"E8", "E2h"}      # huecos al entrenar (rgbd.huecos_entrenamiento); E2h es el control de E8
-ENTRENABLE = {"E1u": ("stage4",), "E7": ("stage4",)}    # etapas del codificador de color que se ajustan
+HUECOS = {"E8", "E2h", "E9"}    # huecos al entrenar (rgbd.huecos_entrenamiento); E2h es el control de E8
+ENTRENABLE = {e: ("stage4",) for e in ("E1u", "E7", "E2u", "E9")}   # etapas del codificador de color que se ajustan
+FIJO = {"E9": "E1u"}        # experto de color ya entrenado y congelado (D-04)
 FACTOR_COD = 0.1            # lr de esas etapas = 0.1 × la de la cabeza
 AUX = {"E7": (1.0, 3.0, 10.0)}   # pesos de la pérdida auxiliar de profundidad que se barren en la validación
 LRS = (3e-4, 1e-3, 3e-3)
@@ -109,7 +112,16 @@ def perdida_prof(pred, prof):
 
 
 def construir(exp):
-    return rgbd.RGBD(FUSION[exp], entrenable=ENTRENABLE.get(exp, ()), aux_prof=exp in AUX).to(DEV)
+    return rgbd.RGBD(FUSION[exp], entrenable=ENTRENABLE.get(exp, ()), aux_prof=exp in AUX,
+                     experto_fijo=exp in FIJO).to(DEV)
+
+
+def experto_de(exp, semilla, validacion):
+    """Carpeta del modelo que hace de experto de color fijo (E9): el de `FIJO[exp]` con su lr elegida y la misma
+    semilla; en la validación, su corrida de validación, que no vio esas escenas."""
+    base = FIJO[exp]
+    (lr, _), _ = elegida(base)
+    return RUNS / nombre_corrida(base, lr, 0 if validacion else semilla, validacion)
 
 
 def nombre_corrida(exp, lr, semilla, validacion=False, aux=None, humo=False):
@@ -172,6 +184,9 @@ def entrenar(exp, lr, semilla, epocas=60, lote=8, validacion=False, humo=False, 
     salida.mkdir(parents=True, exist_ok=True)
 
     modelo = construir(exp)
+    if exp in FIJO:
+        experto = experto_de(exp, semilla, validacion)
+        modelo.fijar_experto(torch.load(experto / "cabeza.pt", map_location=DEV))
     nombres = [n for n, p in modelo.named_parameters() if p.requires_grad]
     cod = [p for n, p in modelo.named_parameters() if p.requires_grad and n.startswith("evit.backbone")]
     resto = [p for n, p in modelo.named_parameters() if p.requires_grad and not n.startswith("evit.backbone")]
@@ -200,7 +215,10 @@ def entrenar(exp, lr, semilla, epocas=60, lote=8, validacion=False, humo=False, 
             perdida = ce(sal["seg"], et)
             if "rgb" in sal:      # E8: cada experto con su pérdida; el de profundidad, solo donde hay medida
                 et_fus = torch.where(prof[:, 0] > 0, et, torch.full_like(et, IGNORAR))
-                perdida = perdida + ce(sal["rgb"], et) + ce(sal["fus"], et_fus)
+                if exp in FIJO:   # E9: el experto de color no se entrena
+                    perdida = perdida + ce(sal["fus"], et_fus)
+                else:
+                    perdida = perdida + ce(sal["rgb"], et) + ce(sal["fus"], et_fus)
             if "prof" in sal:     # E7: la profundidad solo enseña
                 perdida = perdida + aux * perdida_prof(sal["prof"], prof)
             opt.zero_grad(set_to_none=True)
@@ -223,6 +241,8 @@ def entrenar(exp, lr, semilla, epocas=60, lote=8, validacion=False, humo=False, 
         out["aux"] = aux
     if exp in ENTRENABLE:
         out["entrenable"] = list(ENTRENABLE[exp])
+    if exp in FIJO:
+        out["experto"] = experto.name
     (salida / "resultado.json").write_text(json.dumps(out, indent=1, ensure_ascii=False), encoding="utf-8")
     torch.save({k: v for k, v in modelo.state_dict().items()
                 if not k.startswith(("evit.backbone", "defm")) or k in nombres}, salida / "cabeza.pt")
@@ -286,13 +306,13 @@ if __name__ == "__main__":
     ap.add_argument("--aux", type=float, default=None)
     ap.add_argument("--barrido", choices=list(FUSION))
     ap.add_argument("--completo", choices=list(FUSION), nargs="+")
-    ap.add_argument("--humo", action="store_true")
+    ap.add_argument("--humo", choices=list(FUSION), nargs="*", help="sin nombres, todos los experimentos")
     ap.add_argument("--reevaluar", action="store_true")
     a = ap.parse_args()
     if a.reevaluar:
         reevaluar()
-    elif a.humo:
-        for exp in FUSION:
+    elif a.humo is not None:
+        for exp in a.humo or FUSION:
             entrenar(exp, 1e-3, 0, humo=True)
     elif a.completo:
         for exp in a.completo:

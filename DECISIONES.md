@@ -80,6 +80,38 @@ entrenar.
   abrir los resultados.
 - **IA.** Propuso los diseños y los valores fijados de antemano y escribió el código.
 
+## D-04 · Controles de ajuste y de ensamble; E2u y E9
+
+**Fecha** 2026-10-29 · **Estado** 🟡 provisional · **Origen** los resultados de D-03 (al final de este archivo): E1u
+iguala a E2 sin usar profundidad, y la ventaja de E8 con profundidad completa se explica por promediar dos
+cabezas. Se registra antes de entrenar.
+
+- **Línea base de color: E1u**, no E1. Para un modelo con dos cabezas, o para dos modelos combinados, la
+  comparación justa incluye el promedio de dos modelos de color de semillas distintas (control del ensamble).
+- **E2u**: E2 con la última etapa del codificador de color ajustada como en E1u (lr 10 veces menor). Mide si la
+  profundidad suma sobre el ajuste en un solo modelo.
+- **Pruebas sin entrenar con E1u + E2u** (`src/combinar.py`; `combinar_e1_e2.py` se conserva): las de D-03 más
+  un tope a ∈ {0.5, 0.6, 0.7, 0.8, 1} para α, α = a · m_k. Con a < 1 los dos modelos también se promedian con
+  profundidad completa, como hace la compuerta de E8. El umbral del interruptor, (k, a) de la mezcla y a del
+  relleno se eligen en la validación por escenas con la media de todas las condiciones. Incluye el control: el
+  promedio de dos E1u de semillas distintas.
+- **E9**: E8 con el experto de color **congelado e igual al E1u ya entrenado** de la misma semilla (en la
+  validación, el E1u de la validación, que no vio esas escenas). La rama de fusión tiene su propia copia de la
+  última etapa, ajustable (lr 10 veces menor), y su propia cabeza; compuerta y corrupción al entrenar como en E8.
+  Pérdida: mezcla + experto de fusión en los píxeles con medida. Sin profundidad, E9 es exactamente E1u: la
+  garantía queda a nivel de red, que es lo que el bloque de E4 no daba.
+- **Comprobado antes de lanzar:** E8 recargado con el código nuevo reproduce su resultado (semilla 0: 48.5345
+  con profundidad completa y 44.2995 sin ella); E9 recién construido da sin profundidad 47.2617, frente a 47.2616
+  de E1u (diferencia máxima 1.9e-6 en el log de la probabilidad); en E9 solo reciben gradiente la última etapa de
+  la rama de fusión, la fusión, su cabeza y la compuerta, y el experto queda en modo evaluación.
+- **Orden:** diagnósticos de D-03 (`src/diagnosticos_d03.py`) → E2u → E1u + E2u → E9 → E1 + E2 con el tope, para
+  el registro.
+- **Para después:** módulos de fusión del estado del arte (CMX, ESANet), con los mismos controles de ajuste y de
+  ensamble, para no confundir capacidad o promedio con mejor fusión.
+- **Predicciones:** se pueden registrar antes de abrir los resultados.
+- **IA.** Encontró las dos confusiones (ajuste y ensamble), propuso los controles y los diseños, y escribió el
+  código.
+
 ## Predicciones de E1 y E2 (NYUv2, 40 clases)
 
 Registradas el 2026-10-21 en el repositorio del curso antes de entrenar. Se habían visto `09_mlca_bloque` y
@@ -142,3 +174,52 @@ completa gana 0.49 a E1 (E2: 2.32) y queda por debajo de su propio resultado sin
 (semilla 0, 41 imágenes): lo que suma MLCA frente al color es |Δ|/|f| = 0.01, 0.46 y 0.02 a 1/8, 1/16 y 1/32 (E4:
 0.74, 0.89 y 9.43). Con el dropout, la red apagó casi del todo la fusión a 1/8 y 1/32 y solo la mantiene a 1/16.
 Ruido en E1 y E2, ya evaluado: E1 44.99 en los tres niveles; E2 46.66 / 46.25 / 45.25 con 10 / 20 / 50 cm.
+
+## Resultados de D-03 (E1u, E7, E8, E2h y pruebas sin entrenar)
+
+Medido el 2026-10-29 (test, 3 semillas). No se registró predicción: el equipo pidió ver los resultados directamente.
+Elegido en la validación por escenas: E1u lr 1e-3 (43.87 / 45.47 / 43.14 con 3e-4 / 1e-3 / 3e-3); E7 peso
+auxiliar 1 (45.61, frente a 45.38 con 3 y 45.41 con 10); E8 lr 3e-3 (45.31 / 45.97 / 46.58: extremo superior del
+barrido, todavía subiendo); E2h lr 1e-3 (44.94 / 46.04 / 44.95); pruebas sin entrenar, umbral 0.7 y ventana 15.
+
+| Modelo | completa | cruda | aleatoria 10 / 30 / 50 % | regiones | sin | ruido 10 / 20 / 50 cm |
+|---|---|---|---|---|---|---|
+| E1 (referencia) | 44.99 ± 0.30 | 44.99 | 44.99 / 44.99 / 44.99 | 44.99 | 44.99 ± 0.30 | 44.99 / 44.99 / 44.99 |
+| E2 (referencia) | 47.31 ± 0.26 | 46.97 | 46.66 / 44.82 / 43.90 | 46.58 | 42.25 ± 0.45 | 46.66 / 46.25 / 45.25 |
+| E1u | 47.31 ± 0.10 | igual | igual | igual | igual | igual |
+| E7 | 47.28 ± 0.54 | igual | igual | igual | igual | igual |
+| E8 | 48.17 ± 0.33 | 47.08 | 47.62 / 45.81 / 45.11 | 47.70 | 44.00 ± 0.29 | 47.74 / 47.21 / 46.21 |
+| E2h | 46.98 ± 0.22 | 46.63 | 46.55 / 44.60 / 43.95 | 46.75 | 44.59 ± 0.20 | 46.48 / 46.04 / 45.08 |
+| Interruptor E1/E2 | 47.31 ± 0.26 | 45.95 | 46.67 / 44.98 / 44.97 | 46.58 | 44.97 ± 0.30 | 46.66 / 46.25 / 45.25 |
+| Mezcla E1/E2 | 47.31 ± 0.26 | 47.35 | 46.97 / 46.13 / 46.07 | 46.99 | 44.97 ± 0.30 | 46.66 / 46.25 / 45.25 |
+| Relleno + E2 | 47.31 ± 0.26 | 47.13 | 47.31 / 47.31 / 47.32 | 47.08 | 42.28 ± 0.46 | 46.66 / 46.25 / 45.25 |
+
+La desviación entre semillas no pasa de 0.54 en ninguna celda. E1u y E7 no usan profundidad: dan lo mismo en
+todas las condiciones.
+
+**Diagnósticos** (exploratorios, sobre el test; `src/diagnosticos_d03.py`; no sirven para elegir modelos):
+
+- **E1u frente a E2.** Ajustar la última etapa del color da lo mismo que añadir profundidad a un color congelado
+  (47.31 ambos). Por clase, las dos ganancias sobre E1 se parecen solo en parte (correlación 0.53): la profundidad
+  ayuda donde el ajuste no (silla +4.9 frente a +0.8, cojín +5.5 / +0.7, bañera +4.5 / −0.7, lámpara +3.9 / −0.3,
+  piso +3.3 / +0.3, techo +2.2 / −1.5) y el ajuste donde la profundidad menos (cómoda +9.0 / +4.0, lavabo
+  +6.8 / +2.5, puerta +6.2 / +2.2).
+- **E8 con profundidad completa es un promedio de dos cabezas.** La compuerta vale en media 0.59 (no 1): mezcla
+  48.17, experto de fusión solo 47.08, experto de color solo 44.00. Promediar dos modelos de color de semillas
+  distintas, sin profundidad, da 46.60 con E1 (+1.6 sobre uno solo) y 48.50 con E1u. Color más fusión: E1u + E2
+  da 49.11 / 49.26 / 49.07 con α = 0.5 / 0.6 / 0.7, frente a 48.50 de E1u + E1u y 48.27 de E1u + E1 (α = 0.5). Con
+  el promedio controlado, la profundidad aporta unos 0.8 (cifra exploratoria: la de la propuesta saldrá de
+  `src/combinar.py`, con α elegido en la validación).
+- **El experto de color de E8 (44.00) queda por debajo de E1 (44.99)** aunque la garantía de la mezcla es exacta:
+  E8 eligió lr 3e-3, que favorece a la fusión, y con esa lr una cabeza de color pierde 1.45 en la validación
+  (E1: 41.98 con 3e-3 frente a 43.43 con 1e-3).
+- **E7 aprendió profundidad, pero no le sirvió.** Su cabeza auxiliar, con la escala alineada por imagen: SI-RMSE
+  del log 0.169, AbsRel 0.135 y δ < 1.25 del 82.7 % (una constante: 0.357, 0.321 y 46.0 %). La segmentación queda
+  igual que E1u, también en las clases donde la profundidad de entrada ayuda.
+- **Huecos al entrenar (E2h frente a E2):** +2.3 sin profundidad, −0.3 con profundidad completa y nada con huecos
+  aleatorios (los rectángulos de entrenamiento no se transfieren a píxeles sueltos). La ventaja de E8 con huecos
+  aleatorios viene de la compuerta.
+- **«Aleatoria» es una condición fácil:** el relleno con el vecino válido devuelve el resultado con profundidad
+  completa (47.31 con el 10, el 30 y el 50 %). Las que separan los métodos son «regiones», «cruda» y «sin».
+
+Siguiente paso: D-04.

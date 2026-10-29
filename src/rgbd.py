@@ -11,10 +11,11 @@ DeFM (`09_mlca_bloque` §2.2):
 - `mlca` (E4): f_color + MLCA(f_color, f_prof, validez) (`mlca.py`).
 - `respaldo` (E8): dos expertos, la cabeza de E1 sobre el color y la de E2 sobre la fusión, mezclados por píxel
   con una compuerta que solo mira la validez de la profundidad (`Compuerta`). Donde no hay ninguna medida
-  cerca, la compuerta vale 0 y la salida es exactamente la del experto de color (D-03).
+  cerca, la compuerta vale 0 y la salida es exactamente la del experto de color (D-03). Con `experto_fijo`
+  (E9), el experto de color es un E1u ya entrenado, con su última etapa y su cabeza congeladas (D-04).
 
 Opciones que no dependen de la fusión (D-03): `entrenable` deja ajustar etapas del codificador de color (E1u,
-E7), y `aux_prof` añade una cabeza que predice la profundidad solo para entrenar (E7).
+E7, E2u, E9), y `aux_prof` añade una cabeza que predice la profundidad solo para entrenar (E7).
 
 También las condiciones de evaluación de la profundidad (propuesta §7; D-01). Uso de IA: escrito con asistencia
 de IA (Claude, Anthropic); ver `DECISIONES.md`.
@@ -98,9 +99,10 @@ class Compuerta(nn.Module):
 
 
 class RGBD(nn.Module):
-    def __init__(self, fusion="rgb", n_clases=40, entrenable=(), aux_prof=False):
+    def __init__(self, fusion="rgb", n_clases=40, entrenable=(), aux_prof=False, experto_fijo=False):
         super().__init__()
         self.fusion, self.entrenable = fusion, tuple(entrenable)
+        self.etapa4_rgb = None
         self.evit = S.cargar_efficientvit("b1", "ade20k")
         cabeza_ade = self.evit.head                                      # clasificador 64 -> 150 de ADE20K
         self.evit.head = nueva_cabeza(cabeza_ade, n_clases)
@@ -125,20 +127,45 @@ class RGBD(nn.Module):
                 if fusion == "respaldo":                                # experto de color y compuerta
                     self.cabeza_rgb = nueva_cabeza(cabeza_ade, n_clases)
                     self.compuerta = Compuerta()
+                    if experto_fijo:        # E9: copia propia de la última etapa; los pesos, de `fijar_experto`
+                        self.etapa4_rgb = copy.deepcopy(self.evit.backbone.stages[3]).requires_grad_(False)
+                        self.cabeza_rgb.requires_grad_(False)
             elif fusion == "mlca":
                 self.fus = nn.ModuleDict({c: MLCA(c_rgb[c], 128, cabezas=4) for c, _ in PARES})
             else:
                 raise ValueError(fusion)
+        if experto_fijo and self.etapa4_rgb is None:
+            raise ValueError("experto_fijo solo con la fusión «respaldo»")
 
     def train(self, modo=True):
         super().train(modo)
         self.evit.backbone.eval()                # congelado o no, BN con sus estadísticas de ADE20K
         if self.defm is not None:
             self.defm.eval()
+        if self.etapa4_rgb is not None:          # E9: el experto de color no cambia, tampoco sus BN
+            self.etapa4_rgb.eval()
+            self.cabeza_rgb.eval()
         return self
 
     def entrenables(self):
         return [p for p in self.parameters() if p.requires_grad]
+
+    def fijar_experto(self, estado):
+        """E9: carga como experto de color la última etapa y la cabeza de un E1u ya entrenado (su cabeza.pt). Las
+        estadísticas de BN de esa etapa no se guardan en cabeza.pt; son las de ADE20K, las de la copia."""
+        nuevo = {}
+        for k, v in estado.items():
+            if k.startswith("evit.backbone.stages.3."):
+                nuevo["etapa4_rgb." + k.removeprefix("evit.backbone.stages.3.")] = v
+            elif k.startswith("evit.head."):
+                nuevo["cabeza_rgb." + k.removeprefix("evit.head.")] = v
+            else:
+                raise KeyError(f"{k}: no es de un E1u")
+        info = self.load_state_dict(nuevo, strict=False)
+        faltan = [k for k in info.missing_keys if k.startswith(("etapa4_rgb.", "cabeza_rgb."))]
+        assert not info.unexpected_keys
+        assert all(k.startswith("etapa4_rgb.") and k.endswith(("running_mean", "running_var", "num_batches_tracked"))
+                   for k in faltan), faltan
 
     def color(self, rgb_norm):
         """Rasgos de EfficientViT por etapas, como `backbone.forward`; solo las de `entrenable` llevan gradiente."""
@@ -170,7 +197,12 @@ class RGBD(nn.Module):
         lg = salida(self.evit.head, g)
         sal = {}
         if self.fusion == "respaldo":
-            sal["rgb"], sal["fus"] = salida(self.cabeza_rgb, f), lg
+            fr = f
+            if self.etapa4_rgb is not None:                         # E9: la última etapa de E1u
+                with torch.no_grad():
+                    x = self.etapa4_rgb(f["stage3"])
+                fr = {**f, "stage4": x, "stage_final": x}
+            sal["rgb"], sal["fus"] = salida(self.cabeza_rgb, fr), lg
             sal["alfa"] = alfa = self.compuerta(valida, lg.shape[-2:])
             p = (1 - alfa) * sal["rgb"].float().softmax(1) + alfa * lg.float().softmax(1)
             lg = p.clamp_min(1e-12).log()
