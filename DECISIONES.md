@@ -428,6 +428,8 @@ nada de lo que propone. Detalle y evidencia: `auditoria/` (01 a 07).
   excluye el 0 y el signo se repite en las 3 semillas (Holm para las tres condiciones). Ver `06_plan`.
 - **Predicciones del equipo:** (pendientes; escribir aquí antes de ver ningún resultado de E2c, E3c, E4c, E3cd o
   E4cd).
+- **Predicciones de la IA** (Claude, 2026-10-30, antes de lanzar la cola): `predicciones/D06_claude.md`
+  (commit b11ecf9). Van aparte y no sustituyen las del equipo.
 - **IA.** Hizo la auditoría, encontró A2-A5, A8, A14 y A19 (`auditoria/01`), propuso los diseños, los umbrales y
   el criterio, y escribió el código, las pruebas y los documentos. No se cambió ni se reinterpretó ningún
   resultado guardado: las cifras de la v3 siguen en `runs/rgbd/` con sus identificadores originales.
