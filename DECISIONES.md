@@ -386,3 +386,48 @@ desviación entre semillas no pasa de 1.43 (E10 sin profundidad).
   corta frente a lo que da su mezcla.
 
 Siguiente paso: por decidir (D-06).
+
+## D-06 · Auditoría de la v3: rasgos corregidos, E3 y el factorial 2×2 de E5
+
+**Fecha** 2026-10-29 · **Estado** 🟡 provisional, pendiente de aceptación del equipo · **Origen** pedido del equipo
+(Mónica Abarca): auditoría completa de la v3 antes de seguir gastando GPU. Se registra **antes** de entrenar
+nada de lo que propone. Detalle y evidencia: `auditoria/` (01 a 07).
+
+- **Hallazgos que cambian la interpretación** (sin modificar ningún resultado guardado):
+  - P3 y P5 de `dense_bifpn` no dependen de la entrada (D-05). Se confirma que la ruta de extracción es la
+    oficial y que, con pesos no degenerados, la misma ruta da P3 y P5 variables. Falta medir las normas con los
+    pesos oficiales (`tools/verificar_defm.py --nyuv2`). Los benchmarks oficiales de DeFM solo usan P4.
+  - Con claves y valores constantes, MLCA suma un **sesgo** que solo desaparece cuando ninguna celda es válida: es
+    el mecanismo del colapso de E4 (0.78) en 1/8 y 1/32. **E4 de la v3 no permite evaluar la hipótesis.**
+  - Sin dropout, la máscara no actúa al entrenar (la profundidad rellenada da m = 1): E3 y E4 se entrenan igual
+    con la misma semilla, y la máscara es una intervención solo en la inferencia.
+  - La v3 usaba una máscara fraccional; el resumen y el póster dicen binaria con umbral.
+  - E5 de la v3 cambiaba el dropout y, a la vez, el orden de los datos (generador compartido).
+  - «aleatoria» casi no activa la máscara fraccional (ninguna celda queda vacía); la máscara actúa en «cruda»,
+    «regiones» y «sin».
+  - Todo el test de la v3 es exploratorio (usado en D-03 a D-05).
+- **Decisión.**
+  - Familia nueva «c», con los rasgos `c3p4c5` de D-05 y el codificador de color congelado como E1-E5: **E2c**,
+    **E3c** (sin máscara), **E4c** (máscara **binaria**, umbral 0.5 fijado ahora; otro valor solo en la
+    validación), **E3cd** y **E4cd** (+ dropout 0.3, la tasa declarada), y **E4cf/E4cfd** (máscara fraccional,
+    ablación aparte). Dentro de cada par solo cambia la máscara. El dropout usa un generador propio. La lr se
+    elige en la validación con la regla del extremo. Los IDs históricos (E1-E11) no cambian de configuración.
+  - E3c y E4cf se obtienen **sin entrenar** a partir de E4c, y E4cfd a partir de E4cd (`--derivar`), porque
+    tienen la misma trayectoria. Se comprueba con un E3c entrenado (semilla 0).
+  - Condiciones nuevas solo para D-06: `regiones_025`, `regiones_075`, `regiones_100`.
+  - Ingeniería: DeFM en un commit fijo y SHA-256 de los pesos; huella de configuración y ConfigConflict;
+    checkpoints reanudables; errores propagados; `por_imagen.npz`; combinaciones con logits ampliados (las de la
+    v3 no se tocan); desempate determinista de la lr; 93 pruebas.
+  - Orden: `tools/cola_d06.sh` (`auditoria/06_plan_experimentos.md`).
+- **Comprobado antes de lanzar** (CPU, datos sintéticos, pesos aleatorios): 91 pruebas aprobadas y 2 de GPU
+  saltadas (`auditoria/evidencia/pytest_cpu.txt`). Las tablas recalculadas desde los JSON reproducen las cifras
+  publicadas. **Pendiente en la máquina del equipo:** `reproducir_historicos.py` (que E1u y E2u den sus cifras
+  guardadas con el código nuevo) y la verificación de DeFM con los pesos oficiales.
+- **Medida y criterio** (propuestos; el equipo los acepta o cambia antes de abrir resultados): diferencia pareada
+  E4c − E3c en cruda, regiones (0.5) y sin, con el IC por remuestreo de imágenes; «aporta» si es > 0, el IC
+  excluye el 0 y el signo se repite en las 3 semillas (Holm para las tres condiciones). Ver `06_plan`.
+- **Predicciones del equipo:** (pendientes; escribir aquí antes de ver ningún resultado de E2c, E3c, E4c, E3cd o
+  E4cd).
+- **IA.** Hizo la auditoría, encontró A2-A5, A8, A14 y A19 (`auditoria/01`), propuso los diseños, los umbrales y
+  el criterio, y escribió el código, las pruebas y los documentos. No se cambió ni se reinterpretó ningún
+  resultado guardado: las cifras de la v3 siguen en `runs/rgbd/` con sus identificadores originales.

@@ -9,6 +9,19 @@ así que su contenido (aunque sea NaN) no influye. La proyección de salida no t
 sin profundidad (m = 0 en todas partes) S = 0, z = 0, o = 0 y el bloque devuelve exactamente los rasgos de
 color, en cualquier momento del entrenamiento, no solo al inicio.
 
+Dos propiedades que se comprueban en `tests/test_mlca.py` (D-06):
+
+- Con m = 1 en todas las celdas el bloque es una atención cruzada lineal sin máscara (E3): E3 y E4 son la misma
+  red y solo difieren en m. Si al entrenar m = 1 siempre (profundidad rellenada, sin dropout), E3 y E4 siguen la
+  misma trayectoria con la misma semilla, y la máscara solo actúa al evaluar.
+- Si las claves y los valores son iguales en todas las celdas (rasgos de profundidad constantes, como P3 y P5 de
+  DeFM, D-05), o_i = v para toda consulta y para toda máscara con alguna celda válida: el bloque suma un sesgo
+  aprendido, W_o·v, que desaparece de golpe solo cuando no queda ninguna celda válida. Es el mecanismo del
+  colapso de E4 sin profundidad.
+
+Que el bloque aporte exactamente cero sin profundidad no garantiza que la red se comporte como E1: la cabeza se
+entrenó leyendo f_color + MLCA(·), no f_color.
+
 Lo usa `09_mlca_bloque.ipynb`. Uso de IA: escrito con asistencia de IA (Claude, Anthropic); ver
 `DECISIONES.md`.
 """

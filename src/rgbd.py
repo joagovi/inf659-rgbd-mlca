@@ -8,7 +8,9 @@ DeFM (`09_mlca_bloque` §2.2):
 - `rgb` (E1): sin profundidad.
 - `concat` (E2): f_color + W·f_prof, con W (1×1, sin sesgo) iniciada en cero. Equivale a concatenar y proyectar
   con la parte de color fija en la identidad, así que E1 es el caso W = 0. Sin máscara: los huecos entran.
-- `mlca` (E4): f_color + MLCA(f_color, f_prof, validez) (`mlca.py`).
+- `mlca` (E3, E4, E5): f_color + MLCA(f_color, f_prof, m) (`mlca.py`). Lo único que cambia entre E3 y E4 es m
+  (`preparar_mascara`, D-06): «ninguna» (E3), «binaria» (E4c, como el resumen) o «fraccional» (E4 y E5 de la
+  v3; ablación E4cf).
 - `respaldo` (E8): dos expertos, la cabeza de E1 sobre el color y la de E2 sobre la fusión, mezclados por píxel
   con una compuerta que solo mira la validez de la profundidad (`Compuerta`). Donde no hay ninguna medida
   cerca, la compuerta vale 0 y la salida es exactamente la del experto de color (D-03). Con `experto_fijo`
@@ -33,6 +35,7 @@ de IA (Claude, Anthropic); ver `DECISIONES.md`.
 """
 import copy
 import math
+import os
 from collections import OrderedDict
 
 import numpy as np
@@ -71,9 +74,50 @@ def entrada_defm(prof_m, valida):
     return (x - DEFM_MEAN.to(x.device)) / DEFM_STD.to(x.device)
 
 
-def cargar_defm():
-    return torch.hub.load("leggedrobotics/defm:main", "defm_resnet18", pretrained=True, trust_repo=True,
-                          verbose=False)
+def cargar_defm(pesos=None):
+    """DeFM ResNet-18 con el código de un commit fijo y el checkpoint registrado (D-06, `procedencia.py`).
+
+    Hasta la v3 se cargaba `leggedrobotics/defm:main`, sin fijar. El código del modelo es el mismo en todos los
+    commits desde abril de 2026, así que la red construida no cambia; lo que cambia es que ahora queda constancia
+    del commit y del SHA-256 de los pesos. La construcción consume el generador global igual que antes (la red
+    se crea con inicialización aleatoria y después se cargan los pesos), así que las semillas de los
+    experimentos históricos dan la misma inicialización de los módulos entrenables.
+    """
+    import procedencia as P
+    if pesos is None:
+        pesos = not P.sin_pesos()
+    kw = {"pretrained": bool(pesos)}
+    if pesos:
+        ruta = P.ruta_pesos("defm_resnet18.pth", "RGBD_DEFM_PESOS", P.DEFM_HF_REPO, P.DEFM_HF_REVISION)
+        P.registrar("defm_resnet18.pth", ruta)
+        kw["pretrained_path"] = ruta
+    local = os.environ.get("RGBD_DEFM_REPO")
+
+    def construir(**k):
+        if local:
+            return torch.hub.load(local, "defm_resnet18", source="local", verbose=False, **k)
+        return torch.hub.load(f"leggedrobotics/defm:{P.DEFM_COMMIT}", "defm_resnet18", trust_repo=True,
+                              skip_validation=True, verbose=False, **k)
+    m = construir(**kw)
+    return m if pesos else P.pesos_aleatorios_fijos(m, lambda: construir(**kw), semilla=2)
+
+
+def preparar_mascara(m, modo, umbral=0.5):
+    """Fracción válida por celda (B,1,h,w) -> pesos m_j de MLCA según el modo (D-06):
+
+    - «fraccional» (E4 y E5 de la v3, y la ablación E4cf): m_j = fracción de píxeles con medida en la celda.
+    - «binaria» (el resumen de WAIMLAp): m_j = 1 si la fracción supera `umbral`, 0 si no.
+    - «ninguna» (E3): m_j = 1 en todas las celdas; los huecos entran a la atención con lo que DeFM haga de ellos.
+
+    Con profundidad completa las tres dan m = 1 en todas las celdas, y E3 y E4 calculan lo mismo.
+    """
+    if modo == "fraccional":
+        return m
+    if modo == "binaria":
+        return (m > umbral).to(m.dtype)
+    if modo == "ninguna":
+        return torch.ones_like(m)
+    raise ValueError(modo)
 
 
 def rasgos_defm(defm, prof_m, valida, cuales="p3p4p5"):
@@ -128,9 +172,14 @@ class Compuerta(nn.Module):
 
 class RGBD(nn.Module):
     def __init__(self, fusion="rgb", n_clases=40, entrenable=(), aux_prof=False, experto_fijo=False,
-                 rasgos_prof="p3p4p5", codificador=False):
+                 rasgos_prof="p3p4p5", codificador=False, mascara="fraccional", umbral=0.5):
         super().__init__()
         self.fusion, self.entrenable, self.codificador = fusion, tuple(entrenable), codificador
+        if mascara not in ("fraccional", "binaria", "ninguna"):
+            raise ValueError(mascara)
+        if fusion != "mlca" and mascara != "fraccional":
+            raise ValueError("la máscara solo se aplica a la fusión «mlca»")
+        self.mascara, self.umbral = mascara, umbral     # D-06: E3 «ninguna», E4c «binaria», E4/E5/E4cf «fraccional»
         self.rasgos_prof, self.pares = rasgos_prof, RASGOS_PROF[rasgos_prof]
         self.etapa4_rgb = None
         if codificador and fusion != "concat":
@@ -219,9 +268,11 @@ class RGBD(nn.Module):
         f["stage_final"] = x
         return f
 
-    def forward(self, rgb_norm, prof_m=None, valida=None, todo=False):
+    def forward(self, rgb_norm, prof_m=None, valida=None, todo=False, rasgos=False):
         """Logits (B, 40, H/8, W/8). Con `todo`, un diccionario con «seg» y, según el modelo, «rgb», «fus»,
-        «alfa» (E8) o «prof» (E7). En E8 «seg» es el logaritmo de la mezcla de probabilidades."""
+        «alfa» (E8) o «prof» (E7). En E8 «seg» es el logaritmo de la mezcla de probabilidades. Con `rasgos`
+        (diagnósticos, D-06), además «f_color» y «f_fusion» (lo que lee la cabeza en cada escala) y «m» (los
+        pesos de la máscara de MLCA en cada escala)."""
         f = self.color(rgb_norm, 3 if self.codificador else 4)
         g = f
         if self.defm is not None:
@@ -230,15 +281,20 @@ class RGBD(nn.Module):
             if self.codificador:            # E11: la última etapa del color también lee la profundidad
                 x = f["stage3"] + self.fus_cod(fd["P4"].to(f["stage3"].dtype))
                 f["stage4"] = f["stage_final"] = self.etapa(4, x)
-            g = dict(f)
+            g, ms = dict(f), {}
             for c, d in self.pares:
                 if self.fusion == "mlca":
-                    m = validez_a_rasgos(valida, f[c].shape[-2:])
+                    m = preparar_mascara(validez_a_rasgos(valida, f[c].shape[-2:]), self.mascara, self.umbral)
+                    ms[c] = m
                     g[c] = self.fus[c](f[c], fd[d].to(f[c].dtype), m)
                 else:
                     g[c] = f[c] + self.fus[c](fd[d].to(f[c].dtype))
         lg = salida(self.evit.head, g)
         sal = {}
+        if rasgos:
+            sal["f_color"], sal["f_fusion"] = {c: f[c] for c, _ in self.pares}, {c: g[c] for c, _ in self.pares}
+            if self.defm is not None and self.fusion == "mlca":
+                sal["m"] = ms
         if self.fusion == "respaldo":
             fr = f
             if self.etapa4_rgb is not None:                         # E9: la última etapa de E1u
@@ -252,12 +308,16 @@ class RGBD(nn.Module):
         sal["seg"] = lg
         if self.cabeza_prof is not None:
             sal["prof"] = salida(self.cabeza_prof, f)
-        return sal if todo else lg
+        return sal if (todo or rasgos) else lg
 
 
 # --------------------------------------------------------------------------------- condiciones de la profundidad
 CONDICIONES = ["completa", "cruda", "aleatoria_10", "aleatoria_30", "aleatoria_50", "regiones", "sin",
                "ruido_10cm", "ruido_20cm", "ruido_50cm"]
+# D-06: severidades de «regiones» (la de arriba es 0.5), solo para las corridas nuevas. Con huecos aleatorios de
+# píxeles sueltos casi ninguna celda de los rasgos queda vacía, así que la máscara fraccional no quita ninguna
+# (`tools/huecos_efectivos.py`); los rectángulos y la cruda son las condiciones donde la máscara actúa.
+CONDICIONES_EXTRA = ["regiones_025", "regiones_075", "regiones_100"]
 
 
 def huecos_regiones(h, w, s, rng):
@@ -302,6 +362,8 @@ def condicion(nombre, prof_mm, cruda_mm, semilla):
         valida = (prof > 0) & (rng.random(prof.shape) >= int(nombre.split("_")[1]) / 100)
     elif nombre == "regiones":                                 # severidad media de GeomPrompt
         valida = (prof > 0) & ~huecos_regiones(*prof.shape, 0.5, rng)
+    elif nombre.startswith("regiones_"):                       # D-06: otras severidades (025 -> 0.25)
+        valida = (prof > 0) & ~huecos_regiones(*prof.shape, int(nombre.split("_")[1]) / 100, rng)
     elif nombre == "sin":
         valida = np.zeros(prof.shape, bool)
     elif nombre.startswith("ruido_"):                          # gaussiano aditivo de σ cm (D-02, provisional)

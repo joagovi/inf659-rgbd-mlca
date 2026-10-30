@@ -10,6 +10,8 @@ from pathlib import Path
 
 import torch
 
+import procedencia as P
+
 RAIZ = Path(__file__).resolve().parents[1]
 EV_DIR = RAIZ / "third_party" / "efficientvit"
 MEAN = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
@@ -17,14 +19,15 @@ STD = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
 
 
 # --------------------------------------------------------------------------------------------- modelos
-def cargar_efficientvit(variante="b1", dataset="ade20k"):
+def cargar_efficientvit(variante="b1", dataset="ade20k", pesos=None):
     """EfficientViT-Seg con sus pesos oficiales, sin instalar las dependencias del repositorio.
+
+    `pesos=False` (o RGBD_SIN_PESOS=1) deja la red con su inicialización aleatoria: solo para pruebas y medidas de
+    coste. El checkpoint usado y su SHA-256 quedan en `procedencia` (D-06).
 
     Dos sustituciones en memoria: un Triton vacío mientras se importa, y el paquete
     `efficientvit.models.efficientvit` registrado sin ejecutar su __init__ (que importa SAM y DC-AE).
     """
-    from huggingface_hub import hf_hub_download
-
     class _Comodin(types.ModuleType):
         def __getattr__(s, k):
             if k.startswith("__"):
@@ -57,6 +60,13 @@ def cargar_efficientvit(variante="b1", dataset="ade20k"):
                 sys.modules.pop(k)
     m = getattr(evseg, f"efficientvit_seg_{variante}")(dataset=dataset)
     set_norm_eps(m, 1e-5)
-    ruta = hf_hub_download("han-cai/efficientvit-seg", f"efficientvit_seg_{variante}_{dataset}.pt")
+    if pesos is None:
+        pesos = not P.sin_pesos()
+    if not pesos:
+        return P.pesos_aleatorios_fijos(m, lambda: getattr(evseg, f"efficientvit_seg_{variante}")(dataset=dataset),
+                                        semilla=1)
+    nombre = f"efficientvit_seg_{variante}_{dataset}.pt"
+    ruta = P.ruta_pesos(nombre, "RGBD_EVIT_PESOS", P.EVIT_HF_REPO, P.EVIT_HF_REVISION)
+    P.registrar(nombre, ruta)
     m.load_state_dict(load_state_dict_from_file(ruta))
     return m

@@ -39,11 +39,25 @@ so its value is the same in every condition. Details and all conditions:
 | Experiment | Configuration | Status |
 |---|---|---|
 | E1 | EfficientViT, RGB only | done |
-| E2 | EfficientViT + DeFM, concatenation | done |
-| E3 | Linear cross-attention without mask | planned |
-| E4 | **MLCA** | planned |
-| E5 | E4 with and without modality dropout | planned |
-| E6 | E4 with a masked softmax attention (as in UCTNet) | planned |
+| E2 | EfficientViT + DeFM, residual 1×1 projection (concatenation with the RGB block fixed to identity) | done (exploratory) |
+| E4, E5 | MLCA (fractional mask), with and without modality dropout | done, **not usable to test the hypothesis** (see below) |
+| E2c, E3c, E4c, E3cd, E4cd | Corrected depth features; 2×2 factorial mask × modality dropout (binary mask, as in the abstract) | implemented and tested on CPU; **GPU runs pending** |
+| E4cf, E4cfd | Fractional-mask ablation | implemented; pending |
+| E6 | E4 with a masked softmax attention (as in UCTNet) | future work |
+
+**Audit D-06 (2026-10-29).** In the released DeFM ResNet-18 weights only the BiFPN P4 output depends on the input;
+P3 and P5 are constant. With constant keys and values, linear attention returns the same value at every
+position, so in E4 MLCA added a learned constant bias at 1/8 and 1/32 that the mask removes only when *no* depth
+is valid: that is the collapse of E4 without depth (0.78 mIoU), not a property of masking. Also, without modality
+dropout the mask never acts during training (filled depth), and the v3 mask was fractional while the abstract
+specifies a binary one. The corrected design (family «c») uses depth features that depend on the input at all
+three scales and isolates the mask as the only difference between E3c and E4c. All test-set numbers so far are
+exploratory (the test set was used for diagnostics). Details: [`auditoria/`](auditoria/).
+
+| E4 / E5 (v3, exploratory) | Full | Raw holes | Regions | 50 % random | No depth |
+|---|---|---|---|---|---|
+| E4 · MLCA | 45.24 ± 0.29 | 45.04 ± 0.19 | 44.87 ± 0.39 | 41.89 ± 1.40 | 0.78 ± 1.22 |
+| E5 · MLCA + dropout 0.3 | 45.48 ± 0.21 | 45.45 ± 0.20 | 45.39 ± 0.07 | 44.25 ± 0.73 | 45.74 ± 0.10 |
 
 ## Repository
 
@@ -59,8 +73,14 @@ notebooks/
   09_mlca_bloque       the block on synthetic data: exact RGB path, exact hole exclusion, linear cost
   10_nyuv2_huecos      the real holes of NYUv2 raw depth: how many, where, which classes, which scale
   11_e1_e2_nyuv2       results of E1 and E2
+  procedencia.py       pinned DeFM commit, checkpoint SHA-256 and environment, stored in every result (D-06)
+  estadistica.py       statistics from the result files: mean ± SD, t intervals, paired differences, image bootstrap
+  coste.py             parameters, FLOPs, end-to-end latency and peak VRAM of the full network
+  diagnosticos_d06.py  MLCA diagnostics on the scene-level validation split
+tests/         93 automated tests (CPU with synthetic data and random weights; 2 GPU-only)
+auditoria/     D-06 audit: findings, coherence matrix, v2/v3 comparison, DeFM report, tables, plan, verification
 DECISIONES.md  decisions and predictions written before each experiment
-tools/         run a notebook end to end
+tools/         verificar_defm.py, huecos_efectivos.py, reproducir_historicos.py, cola_d06.sh, run_notebook.py
 ```
 
 Code and notebooks are documented in Spanish.
@@ -93,9 +113,11 @@ Data (not versioned), in `datos/nyuv2/`:
 - `splits.mat`: http://horatio.cs.nyu.edu/mit/silberman/indoor_seg_sup/splits.mat
 - `classMapping40.mat`: https://github.com/ankurhanda/nyuv2-meta-data
 
-DeFM is loaded from `torch.hub` (`leggedrobotics/defm`) and the EfficientViT weights from Hugging Face. Then:
+DeFM code is loaded from `torch.hub` at a pinned commit (`leggedrobotics/defm:4849a36`) and both checkpoints from
+Hugging Face; their SHA-256 is stored in every `resultado.json` (`src/procedencia.py`). Then:
 
 ```bash
+pytest -q                                                   # tests; no data or weights needed (D-06)
 python src/entrenar_rgbd.py --humo                          # smoke test: a few steps
 python src/entrenar_rgbd.py --barrido E2                    # learning rate on a scene-level validation split
 python src/entrenar_rgbd.py --exp E2 --lr 3e-4 --semilla 0  # train on the 795 images, evaluate on the 654

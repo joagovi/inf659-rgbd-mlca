@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from entrenar_rgbd import FUSION, RUNS, elegida, nombre_corrida  # noqa: E402
+from entrenar_rgbd import EXPERIMENTOS, FUSION, RUNS, elegida, nombre_corrida  # noqa: E402
 from rgbd import CONDICIONES  # noqa: E402
 
 COLUMNAS = ["completa", "cruda", ("aleatoria_10", "aleatoria_30", "aleatoria_50"), "regiones", "sin",
@@ -58,6 +58,8 @@ def experimentos(validacion):
             continue
         por_cond = {c: [r["resultados"][c]["miou"] for r in rs] for c in CONDICIONES}
         nombre = f"{exp} ({lr:g}{'' if aux is None else f', aux {aux:g}'}){'' if len(rs) == 3 else f', {len(rs)} semillas'}"
+        if any("derivado_de" in r for r in rs):
+            nombre += ", derivado"
         print(fila(nombre, por_cond))
         barridos.append(f"{exp}: " + ", ".join(f"{l:g}{'' if a is None else f' aux {a:g}'} → {v:.2f}"
                                                for (l, a), v in sorted(val.items(), key=str)))
@@ -67,7 +69,7 @@ def experimentos(validacion):
 
 
 def combinaciones():
-    archivos = sorted((RUNS / "combinaciones").glob("**/resultado.json"))
+    archivos = sorted((RUNS / "combinaciones").glob("**/resultado*.json"))
     for archivo in archivos:
         r = json.loads(archivo.read_text(encoding="utf-8"))
         if "color" in r:                                    # combinar.py
@@ -75,13 +77,15 @@ def combinaciones():
             elegido = f"umbral {r['umbral']:g}, {r['mezcla']}, {r['relleno']}"
         else:                                               # combinar_e1_e2.py (D-03)
             titulo, elegido = "E1 + E2 (D-03)", f"umbral {r['umbral']:g}, ventana {r['ventana']}"
+        titulo += f" [{archivo.name}; interpolación: {r.get('interpolar', 'probabilidades')}]"
         print(f"\n{titulo}, elegido en la validación: {elegido}\n")
         print(cabecera("Variante"))
         for v in r["variantes"]:
             print(fila(v, {c: r["test"][c][v]["semillas"] for c in CONDICIONES}))
         if "ensamble_color" in r:
             e = r["ensamble_color"]
-            print(f"\nControl, dos modelos de color de semillas distintas: {e['media']:.2f} ± {e['de']:.2f}")
+            print(f"\nControl, dos modelos de color de semillas distintas: {e['media']:.2f} ± {e['de']:.2f} "
+                  f"(pares {', '.join(f'{x:.2f}' for x in e['miou'])}; solapados, no independientes)")
 
 
 def main():
