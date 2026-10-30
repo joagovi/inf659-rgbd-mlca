@@ -7,6 +7,8 @@
   de 1/8). Con a = 1 es la mezcla de D-03; con a < 1, aun con profundidad completa los dos modelos se promedian,
   como hace la compuerta de E8 (α medio 0.59 con profundidad completa).
 - relleno: cada hueco toma la profundidad del píxel válido más cercano y p = (1 − a)·p_color + a·p_fusión.
+- relleno_interruptor (D-07): el relleno si la imagen tiene al menos `umbral` de profundidad válida; el de color
+  si no. Junta lo que mejor funcionó en D-05 con la profundidad cruda (relleno) y sin ella (interruptor).
 
 `umbral`, k y a se eligen en la validación por escenas, con los modelos de validación y la media de todas las
 condiciones; el test se evalúa una vez, con las 3 semillas (color y fusión de la misma semilla).
@@ -114,6 +116,10 @@ def recorrer(m1, m2, datos, posiciones, lote=4, interpolar="probabilidades"):
                         sumar(cond, f"mezcla_{v}_{a:g}", (1 - a * m) * p1 + a * m * p2, et)
             for a in TOPES:
                 sumar(cond, f"relleno_{a:g}", (1 - a) * p1 + a * p2r, et)
+            for u in UMBRALES:
+                for a in TOPES:
+                    sumar(cond, f"relleno_interruptor_{u:g}_{a:g}",
+                          torch.where(frac >= u, (1 - a) * p1 + a * p2r, p1), et)
     res = {}
     for (cond, var), c in conf.items():
         c = c.double()
@@ -173,12 +179,14 @@ def main():
     umbral = max(UMBRALES, key=lambda u: media(f"interruptor_{u:g}"))
     mezcla = max((f"mezcla_{v}_{t:g}" for v in VENTANAS for t in TOPES), key=media)
     relleno = max((f"relleno_{t:g}" for t in TOPES), key=media)
+    rell_int = max((f"relleno_interruptor_{u:g}_{t:g}" for u in UMBRALES for t in TOPES), key=media)
     print(f"{a.color}+{a.fusion}, validación (media de las condiciones): color {media('color'):.2f}, "
           f"fusión {media('fusion'):.2f}, interruptor_{umbral:g} {media(f'interruptor_{umbral:g}'):.2f}, "
-          f"{mezcla} {media(mezcla):.2f}, {relleno} {media(relleno):.2f}", flush=True)
+          f"{mezcla} {media(mezcla):.2f}, {relleno} {media(relleno):.2f}, {rell_int} {media(rell_int):.2f}",
+          flush=True)
 
     test = nyuv2.cache("test")
-    variantes = ["color", "fusion", f"interruptor_{umbral:g}", mezcla, relleno]
+    variantes = ["color", "fusion", f"interruptor_{umbral:g}", mezcla, relleno, rell_int]
     por_semilla = []
     for s in range(3):
         m1, _ = cargar(RUNS / nombre_corrida(a.color, lr1, s))
@@ -189,7 +197,7 @@ def main():
     tabla = {c: {v: [r[c][v] for r in por_semilla] for v in variantes} for c in rgbd.CONDICIONES}
     control = ensamble_color(a.color, lr1, test, **kw)
     out = {"color": [a.color, lr1], "fusion": [a.fusion, lr2], "validacion": val, "umbral": umbral,
-           "mezcla": mezcla, "relleno": relleno, "variantes": variantes,
+           "mezcla": mezcla, "relleno": relleno, "relleno_interruptor": rell_int, "variantes": variantes,
            "test": {c: {v: {"media": st.mean(x), "de": st.stdev(x), "semillas": x} for v, x in fila.items()}
                     for c, fila in tabla.items()},
            "ensamble_color": {"pares": PARES, "miou": control, "media": st.mean(control), "de": st.stdev(control),
