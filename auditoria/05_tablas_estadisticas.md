@@ -154,6 +154,162 @@ Calculadas solo a partir de los `resultado.json` de `runs/rgbd/`. Test oficial d
 | ruido_20cm | 47.71 ± 0.08 | ±0.21 | 47.66 / 47.81 / 47.66 | 0.04 ± 0.00 |
 | ruido_50cm | 47.65 ± 0.08 | ±0.21 | 47.60 / 47.75 / 47.60 | 0.11 ± 0.00 |
 
+### E10 · E2u con C3/P4/C5 · lr 0.001 · 3 semillas
+
+| condición | media ± DE | IC 95 % | por semilla | caída frente a completa (media ± DE) |
+|---|---|---|---|---|
+| completa | 49.24 ± 0.24 | ±0.60 | 49.10 / 49.10 / 49.52 | 0.00 ± 0.00 |
+| cruda | 48.10 ± 0.28 | ±0.71 | 47.98 / 47.89 / 48.42 | 1.14 ± 0.06 |
+| aleatoria_10 | 48.39 ± 0.42 | ±1.05 | 47.91 / 48.55 / 48.70 | 0.85 ± 0.32 |
+| aleatoria_30 | 45.04 ± 0.30 | ±0.74 | 44.95 / 44.79 / 45.36 | 4.20 ± 0.09 |
+| aleatoria_50 | 43.13 ± 0.44 | ±1.09 | 43.42 / 42.62 / 43.35 | 6.11 ± 0.40 |
+| regiones | 48.17 ± 0.38 | ±0.95 | 47.86 / 48.04 / 48.60 | 1.07 ± 0.16 |
+| sin | 39.15 ± 1.43 | ±3.56 | 39.98 / 37.49 / 39.97 | 10.09 ± 1.33 |
+| ruido_10cm | 48.13 ± 0.23 | ±0.57 | 47.87 / 48.28 / 48.24 | 1.11 ± 0.25 |
+| ruido_20cm | 47.19 ± 0.36 | ±0.89 | 46.79 / 47.47 / 47.32 | 2.05 ± 0.37 |
+| ruido_50cm | 45.25 ± 0.27 | ±0.68 | 44.94 / 45.41 / 45.41 | 3.99 ± 0.26 |
+
+### E11 · E10 + profundidad en el codificador · lr 0.003 · 3 semillas
+
+| condición | media ± DE | IC 95 % | por semilla | caída frente a completa (media ± DE) |
+|---|---|---|---|---|
+| completa | 51.06 ± 0.16 | ±0.39 | 50.90 / 51.06 / 51.21 | 0.00 ± 0.00 |
+| cruda | 47.71 ± 0.19 | ±0.47 | 47.57 / 47.64 / 47.93 | 3.34 ± 0.07 |
+| aleatoria_10 | 48.48 ± 0.22 | ±0.54 | 48.34 / 48.38 / 48.73 | 2.57 ± 0.10 |
+| aleatoria_30 | 39.46 ± 0.53 | ±1.31 | 39.50 / 38.91 / 39.96 | 11.60 ± 0.48 |
+| aleatoria_50 | 33.39 ± 1.31 | ±3.24 | 33.94 / 31.89 / 34.32 | 17.67 ± 1.29 |
+| regiones | 49.19 ± 0.02 | ±0.05 | 49.17 / 49.20 / 49.21 | 1.86 ± 0.14 |
+| sin | 15.75 ± 1.21 | ±3.00 | 15.11 / 17.14 / 14.99 | 35.31 ± 1.23 |
+| ruido_10cm | 47.73 ± 0.25 | ±0.63 | 47.74 / 47.47 / 47.97 | 3.33 ± 0.23 |
+| ruido_20cm | 45.40 ± 0.22 | ±0.54 | 45.53 / 45.15 / 45.52 | 5.66 ± 0.27 |
+| ruido_50cm | 39.54 ± 0.82 | ±2.04 | 39.99 / 38.59 / 40.04 | 11.52 ± 0.83 |
+
+### E2c · E2 con C3/P4/C5 · lr 0.003 · 3 semillas
+
+| condición | media ± DE | IC 95 % | por semilla | caída frente a completa (media ± DE) |
+|---|---|---|---|---|
+| completa | 47.53 ± 0.17 | ±0.41 | 47.72 / 47.44 / 47.42 | 0.00 ± 0.00 |
+| cruda | 43.32 ± 0.58 | ±1.45 | 43.96 / 43.16 / 42.82 | 4.21 ± 0.42 |
+| aleatoria_10 | 44.99 ± 0.53 | ±1.33 | 45.60 / 44.59 / 44.79 | 2.54 ± 0.38 |
+| aleatoria_30 | 35.79 ± 1.29 | ±3.21 | 36.85 / 34.35 / 36.18 | 11.74 ± 1.19 |
+| aleatoria_50 | 30.38 ± 2.19 | ±5.44 | 32.33 / 28.01 / 30.81 | 17.15 ± 2.07 |
+| regiones | 44.79 ± 0.40 | ±1.00 | 44.93 / 44.34 / 45.11 | 2.73 ± 0.40 |
+| sin | 20.33 ± 2.48 | ±6.16 | 22.07 / 17.49 / 21.44 | 27.20 ± 2.39 |
+| ruido_10cm | 44.61 ± 0.45 | ±1.11 | 45.10 / 44.23 / 44.50 | 2.92 ± 0.30 |
+| ruido_20cm | 42.96 ± 0.39 | ±0.96 | 43.39 / 42.64 / 42.85 | 4.57 ± 0.24 |
+| ruido_50cm | 39.26 ± 0.69 | ±1.71 | 39.99 / 38.63 / 39.15 | 8.27 ± 0.54 |
+| regiones_025 | 46.64 ± 0.17 | ±0.41 | 46.77 / 46.45 / 46.68 | 0.89 ± 0.14 |
+| regiones_075 | 41.41 ± 0.52 | ±1.30 | 41.77 / 40.81 / 41.66 | 6.11 ± 0.46 |
+| regiones_100 | 37.29 ± 0.77 | ±1.92 | 38.13 / 36.60 / 37.14 | 10.24 ± 0.62 |
+
+### E3c · atención lineal sin máscara · lr 0.003 · 3 semillas · derivado sin entrenar
+
+| condición | media ± DE | IC 95 % | por semilla | caída frente a completa (media ± DE) |
+|---|---|---|---|---|
+| completa | 44.99 ± 0.20 | ±0.49 | 45.19 / 44.98 / 44.80 | 0.00 ± 0.00 |
+| cruda | 41.19 ± 0.18 | ±0.45 | 41.39 / 41.03 / 41.15 | 3.80 ± 0.15 |
+| aleatoria_10 | 40.37 ± 0.62 | ±1.54 | 40.61 / 40.83 / 39.66 | 4.62 ± 0.49 |
+| aleatoria_30 | 30.65 ± 3.27 | ±8.12 | 30.25 / 34.10 / 27.60 | 14.34 ± 3.20 |
+| aleatoria_50 | 22.90 ± 4.25 | ±10.57 | 20.71 / 27.80 / 20.19 | 22.09 ± 4.26 |
+| regiones | 43.15 ± 0.34 | ±0.85 | 43.53 / 42.86 / 43.06 | 1.84 ± 0.24 |
+| sin | 13.71 ± 5.13 | ±12.74 | 16.95 / 7.79 / 16.37 | 31.28 ± 5.11 |
+| ruido_10cm | 42.17 ± 0.37 | ±0.92 | 42.34 / 42.43 / 41.75 | 2.81 ± 0.25 |
+| ruido_20cm | 40.60 ± 1.08 | ±2.68 | 40.35 / 41.78 / 39.67 | 4.39 ± 1.04 |
+| ruido_50cm | 35.82 ± 2.29 | ±5.69 | 35.32 / 38.32 / 33.83 | 9.16 ± 2.24 |
+| regiones_025 | 44.42 ± 0.19 | ±0.47 | 44.63 / 44.33 / 44.29 | 0.57 ± 0.07 |
+| regiones_075 | 40.44 ± 0.59 | ±1.47 | 40.94 / 39.79 / 40.59 | 4.55 ± 0.55 |
+| regiones_100 | 37.46 ± 0.72 | ±1.78 | 37.48 / 36.73 / 38.16 | 7.53 ± 0.82 |
+
+### E3cd · E3c + dropout 0.3 · lr 0.001 · 3 semillas
+
+| condición | media ± DE | IC 95 % | por semilla | caída frente a completa (media ± DE) |
+|---|---|---|---|---|
+| completa | 45.45 ± 0.29 | ±0.73 | 45.68 / 45.12 / 45.54 | 0.00 ± 0.00 |
+| cruda | 44.91 ± 0.44 | ±1.10 | 45.22 / 44.40 / 45.09 | 0.54 ± 0.15 |
+| aleatoria_10 | 45.21 ± 0.19 | ±0.47 | 45.40 / 45.02 / 45.21 | 0.24 ± 0.12 |
+| aleatoria_30 | 44.03 ± 0.74 | ±1.85 | 44.49 / 43.17 / 44.42 | 1.42 ± 0.46 |
+| aleatoria_50 | 42.15 ± 0.99 | ±2.45 | 43.12 / 41.14 / 42.18 | 3.30 ± 0.70 |
+| regiones | 45.15 ± 0.62 | ±1.55 | 45.64 / 44.44 / 45.36 | 0.30 ± 0.33 |
+| sin | 45.31 ± 0.25 | ±0.62 | 45.54 / 45.04 / 45.33 | 0.14 ± 0.07 |
+| ruido_10cm | 45.03 ± 0.45 | ±1.12 | 45.29 / 44.51 / 45.30 | 0.42 ± 0.18 |
+| ruido_20cm | 44.63 ± 0.64 | ±1.59 | 44.88 / 43.90 / 45.10 | 0.82 ± 0.39 |
+| ruido_50cm | 43.61 ± 0.92 | ±2.30 | 44.23 / 42.55 / 44.05 | 1.84 ± 0.64 |
+| regiones_025 | 45.39 ± 0.39 | ±0.98 | 45.74 / 44.96 / 45.46 | 0.06 ± 0.11 |
+| regiones_075 | 44.63 ± 0.86 | ±2.12 | 45.29 / 43.66 / 44.94 | 0.82 ± 0.56 |
+| regiones_100 | 44.05 ± 0.99 | ±2.45 | 44.74 / 42.92 / 44.48 | 1.40 ± 0.69 |
+
+### E4c · MLCA, máscara binaria (resumen) · lr 0.003 · 3 semillas
+
+| condición | media ± DE | IC 95 % | por semilla | caída frente a completa (media ± DE) |
+|---|---|---|---|---|
+| completa | 44.99 ± 0.20 | ±0.49 | 45.19 / 44.98 / 44.80 | 0.00 ± 0.00 |
+| cruda | 40.56 ± 0.34 | ±0.84 | 40.77 / 40.17 / 40.75 | 4.43 ± 0.38 |
+| aleatoria_10 | 40.37 ± 0.62 | ±1.54 | 40.61 / 40.83 / 39.66 | 4.62 ± 0.49 |
+| aleatoria_30 | 30.65 ± 3.27 | ±8.12 | 30.25 / 34.10 / 27.60 | 14.34 ± 3.20 |
+| aleatoria_50 | 23.36 ± 3.66 | ±9.10 | 20.81 / 27.56 / 21.72 | 21.62 ± 3.71 |
+| regiones | 43.77 ± 0.39 | ±0.97 | 44.15 / 43.80 / 43.37 | 1.21 ± 0.19 |
+| sin | 14.86 ± 4.18 | ±10.39 | 15.83 / 18.47 / 10.28 | 30.13 ± 4.06 |
+| ruido_10cm | 42.17 ± 0.37 | ±0.92 | 42.34 / 42.43 / 41.75 | 2.81 ± 0.25 |
+| ruido_20cm | 40.60 ± 1.08 | ±2.68 | 40.35 / 41.78 / 39.67 | 4.39 ± 1.04 |
+| ruido_50cm | 35.82 ± 2.29 | ±5.69 | 35.32 / 38.32 / 33.83 | 9.16 ± 2.24 |
+| regiones_025 | 44.53 ± 0.21 | ±0.52 | 44.73 / 44.53 / 44.31 | 0.46 ± 0.02 |
+| regiones_075 | 42.06 ± 0.50 | ±1.25 | 42.64 / 41.80 / 41.74 | 2.93 ± 0.33 |
+| regiones_100 | 39.74 ± 0.87 | ±2.15 | 40.57 / 38.84 / 39.79 | 5.25 ± 0.78 |
+
+### E4cd · E4c + dropout 0.3 · lr 0.0003 · 3 semillas
+
+| condición | media ± DE | IC 95 % | por semilla | caída frente a completa (media ± DE) |
+|---|---|---|---|---|
+| completa | 45.21 ± 0.33 | ±0.83 | 45.45 / 44.83 / 45.36 | 0.00 ± 0.00 |
+| cruda | 44.91 ± 0.59 | ±1.47 | 45.24 / 44.23 / 45.27 | 0.30 ± 0.27 |
+| aleatoria_10 | 44.88 ± 0.37 | ±0.92 | 44.89 / 44.51 / 45.25 | 0.33 ± 0.22 |
+| aleatoria_30 | 43.27 ± 0.77 | ±1.92 | 43.47 / 42.42 / 43.92 | 1.94 ± 0.49 |
+| aleatoria_50 | 42.23 ± 1.82 | ±4.53 | 42.52 / 40.28 / 43.89 | 2.98 ± 1.54 |
+| regiones | 44.93 ± 0.23 | ±0.58 | 45.13 / 44.67 / 45.01 | 0.28 ± 0.10 |
+| sin | 46.16 ± 0.26 | ±0.65 | 46.34 / 45.86 / 46.27 | -0.94 ± 0.07 |
+| ruido_10cm | 44.88 ± 0.41 | ±1.01 | 45.15 / 44.41 / 45.08 | 0.34 ± 0.08 |
+| ruido_20cm | 44.63 ± 0.61 | ±1.51 | 45.00 / 43.92 / 44.95 | 0.59 ± 0.28 |
+| ruido_50cm | 43.80 ± 0.99 | ±2.46 | 44.00 / 42.72 / 44.67 | 1.41 ± 0.71 |
+| regiones_025 | 45.22 ± 0.30 | ±0.74 | 45.50 / 44.90 / 45.25 | -0.00 ± 0.10 |
+| regiones_075 | 44.40 ± 0.29 | ±0.73 | 44.50 / 44.07 / 44.63 | 0.82 ± 0.12 |
+| regiones_100 | 43.64 ± 0.50 | ±1.24 | 43.44 / 43.27 / 44.21 | 1.58 ± 0.43 |
+
+### E4cf · MLCA, máscara fraccional · lr 0.003 · 3 semillas · derivado sin entrenar
+
+| condición | media ± DE | IC 95 % | por semilla | caída frente a completa (media ± DE) |
+|---|---|---|---|---|
+| completa | 44.99 ± 0.20 | ±0.49 | 45.19 / 44.98 / 44.80 | 0.00 ± 0.00 |
+| cruda | 40.44 ± 0.21 | ±0.52 | 40.41 / 40.25 / 40.66 | 4.55 ± 0.36 |
+| aleatoria_10 | 40.38 ± 0.63 | ±1.55 | 40.62 / 40.85 / 39.67 | 4.61 ± 0.50 |
+| aleatoria_30 | 30.71 ± 3.22 | ±7.99 | 30.27 / 34.12 / 27.73 | 14.28 ± 3.15 |
+| aleatoria_50 | 22.97 ± 4.19 | ±10.42 | 20.74 / 27.81 / 20.37 | 22.02 ± 4.20 |
+| regiones | 43.80 ± 0.37 | ±0.91 | 44.17 / 43.79 / 43.43 | 1.19 ± 0.17 |
+| sin | 14.86 ± 4.18 | ±10.39 | 15.83 / 18.47 / 10.28 | 30.13 ± 4.06 |
+| ruido_10cm | 42.17 ± 0.37 | ±0.92 | 42.34 / 42.43 / 41.75 | 2.81 ± 0.25 |
+| ruido_20cm | 40.60 ± 1.08 | ±2.68 | 40.35 / 41.78 / 39.67 | 4.39 ± 1.04 |
+| ruido_50cm | 35.82 ± 2.29 | ±5.69 | 35.32 / 38.32 / 33.83 | 9.16 ± 2.24 |
+| regiones_025 | 44.56 ± 0.23 | ±0.56 | 44.77 / 44.58 / 44.33 | 0.43 ± 0.04 |
+| regiones_075 | 42.04 ± 0.47 | ±1.18 | 42.59 / 41.77 / 41.76 | 2.95 ± 0.31 |
+| regiones_100 | 39.71 ± 0.87 | ±2.15 | 40.49 / 38.78 / 39.86 | 5.28 ± 0.80 |
+
+### E4cfd · E4cf + dropout 0.3 · lr 0.0003 · 3 semillas · derivado sin entrenar
+
+| condición | media ± DE | IC 95 % | por semilla | caída frente a completa (media ± DE) |
+|---|---|---|---|---|
+| completa | 45.21 ± 0.33 | ±0.83 | 45.45 / 44.83 / 45.36 | 0.00 ± 0.00 |
+| cruda | 44.93 ± 0.59 | ±1.46 | 45.28 / 44.25 / 45.25 | 0.29 ± 0.26 |
+| aleatoria_10 | 44.88 ± 0.37 | ±0.92 | 44.89 / 44.51 / 45.25 | 0.33 ± 0.23 |
+| aleatoria_30 | 43.28 ± 0.77 | ±1.92 | 43.48 / 42.42 / 43.93 | 1.93 ± 0.49 |
+| aleatoria_50 | 42.28 ± 1.80 | ±4.48 | 42.53 / 40.36 / 43.94 | 2.94 ± 1.53 |
+| regiones | 44.96 ± 0.22 | ±0.55 | 45.14 / 44.71 / 45.04 | 0.25 ± 0.11 |
+| sin | 46.16 ± 0.26 | ±0.65 | 46.34 / 45.86 / 46.27 | -0.94 ± 0.07 |
+| ruido_10cm | 44.88 ± 0.41 | ±1.01 | 45.15 / 44.41 / 45.08 | 0.34 ± 0.08 |
+| ruido_20cm | 44.63 ± 0.61 | ±1.51 | 45.00 / 43.92 / 44.95 | 0.59 ± 0.28 |
+| ruido_50cm | 43.80 ± 0.99 | ±2.46 | 44.00 / 42.72 / 44.67 | 1.41 ± 0.71 |
+| regiones_025 | 45.22 ± 0.29 | ±0.72 | 45.49 / 44.92 / 45.25 | -0.01 ± 0.10 |
+| regiones_075 | 44.42 ± 0.29 | ±0.71 | 44.49 / 44.11 / 44.67 | 0.79 ± 0.14 |
+| regiones_100 | 43.66 ± 0.50 | ±1.25 | 43.46 / 43.29 / 44.24 | 1.55 ± 0.43 |
+
 ## 2. Diferencias pareadas por semilla (A − B), media ± DE [IC 95 %]
 
 El emparejamiento por semilla comparte la inicialización de la cabeza; el orden de los datos solo si las dos configuraciones consumen el generador igual (no en E5 frente a E4 de la v3). Las filas sin datos se omiten.
@@ -167,14 +323,54 @@ El emparejamiento por semilla comparte la inicialización de la cabeza; el orden
 | E5 − E1 | MLCA + dropout frente a solo color | +0.49 ± 0.14 [±0.36] | +0.46 ± 0.14 [±0.34] | +0.40 ± 0.24 [±0.60] | -0.73 ± 0.85 [±2.11] | +0.75 ± 0.20 [±0.50] | -0.20 ± 0.12 [±0.29] |
 | E2u − E1u | profundidad sobre el ajuste | +1.28 ± 0.24 [±0.60] | +0.40 ± 0.49 [±1.22] | +0.41 ± 0.30 [±0.75] | -3.41 ± 0.19 [±0.47] | -10.47 ± 0.78 [±1.93] | -1.84 ± 0.24 [±0.59] |
 | E9 − E1u | respaldo con compuerta frente a E1u | +0.45 ± 0.01 [±0.03] | +0.41 ± 0.01 [±0.03] | +0.42 ± 0.01 [±0.03] | +0.26 ± 0.01 [±0.03] | +0.00 ± 0.00 [±0.00] | +0.34 ± 0.02 [±0.04] |
+| E2c − E1 | profundidad, rasgos corregidos | +2.54 ± 0.27 [±0.67] | -1.67 ± 0.59 [±1.46] | -0.19 ± 0.13 [±0.33] | -14.61 ± 1.91 [±4.74] | -24.66 ± 2.18 [±5.42] | -5.73 ± 0.48 [±1.19] |
+| E4c − E3c | efecto de la máscara sin dropout | +0.00 ± 0.00 [±0.00] | -0.63 ± 0.23 [±0.56] | +0.63 ± 0.31 [±0.78] | +0.47 ± 0.94 [±2.33] | +1.15 ± 8.61 [±21.40] | +0.00 ± 0.00 [±0.00] |
+| E4cd − E3cd | efecto de la máscara con dropout | -0.24 ± 0.05 [±0.13] | +0.01 ± 0.17 [±0.43] | -0.21 ± 0.39 [±0.97] | +0.09 ± 1.42 [±3.52] | +0.85 ± 0.07 [±0.18] | +0.19 ± 0.42 [±1.05] |
+| E3cd − E3c | efecto del dropout sin máscara | +0.46 ± 0.30 [±0.75] | +3.71 ± 0.30 [±0.75] | +2.00 ± 0.37 [±0.92] | +19.25 ± 5.12 [±12.71] | +31.60 ± 4.90 [±12.17] | +7.79 ± 3.15 [±7.84] |
+| E4cd − E4c | efecto del dropout con máscara | +0.22 ± 0.35 [±0.88] | +4.35 ± 0.25 [±0.63] | +1.16 ± 0.41 [±1.03] | +18.87 ± 5.33 [±13.25] | +31.30 ± 4.35 [±10.82] | +7.97 ± 3.28 [±8.15] |
+| E4cf − E4c | máscara fraccional frente a binaria | +0.00 ± 0.00 [±0.00] | -0.13 ± 0.22 [±0.54] | +0.02 ± 0.03 [±0.09] | -0.39 ± 0.84 [±2.10] | +0.00 ± 0.00 [±0.00] | +0.00 ± 0.00 [±0.00] |
+| E4cf − E4 | rasgos corregidos, misma máscara fraccional | -0.25 ± 0.13 [±0.33] | -4.60 ± 0.16 [±0.40] | -1.07 ± 0.04 [±0.10] | -18.91 ± 3.70 [±9.20] | +14.08 ± 5.34 [±13.27] | -8.35 ± 2.36 [±5.87] |
 
 ## 3. Factorial 2×2 de E5 (máscara × dropout, rasgos corregidos)
 
-Pendiente: faltan E3c, E4c, E3cd, E4cd (no se han entrenado). No se rellena nada.
+| condición | máscara sin dropout (E4c − E3c) | máscara con dropout (E4cd − E3cd) | dropout sin máscara (E3cd − E3c) | interacción |
+|---|---|---|---|---|
+| completa | +0.00 ± 0.00 | -0.24 ± 0.05 | +0.46 ± 0.30 | -0.24 ± 0.05 |
+| cruda | -0.63 ± 0.23 | +0.01 ± 0.17 | +3.71 ± 0.30 | +0.64 ± 0.05 |
+| aleatoria_10 | +0.00 ± 0.00 | -0.33 ± 0.32 | +4.84 ± 0.68 | -0.33 ± 0.32 |
+| aleatoria_30 | +0.00 ± 0.00 | -0.76 ± 0.26 | +13.38 ± 3.95 | -0.76 ± 0.26 |
+| aleatoria_50 | +0.47 ± 0.94 | +0.09 ± 1.42 | +19.25 ± 5.12 | -0.38 ± 0.49 |
+| regiones | +0.63 ± 0.31 | -0.21 ± 0.39 | +2.00 ± 0.37 | -0.84 ± 0.26 |
+| sin | +1.15 ± 8.61 | +0.85 ± 0.07 | +31.60 ± 4.90 | -0.30 ± 8.66 |
+| ruido_10cm | +0.00 ± 0.00 | -0.15 ± 0.06 | +2.86 ± 0.74 | -0.15 ± 0.06 |
+| ruido_20cm | +0.00 ± 0.00 | +0.00 ± 0.13 | +4.03 ± 1.71 | +0.00 ± 0.13 |
+| ruido_50cm | +0.00 ± 0.00 | +0.19 ± 0.42 | +7.79 ± 3.15 | +0.19 ± 0.42 |
+| regiones_025 | +0.11 ± 0.09 | -0.17 ± 0.10 | +0.97 ± 0.29 | -0.28 ± 0.06 |
+| regiones_075 | +1.61 ± 0.44 | -0.23 ± 0.60 | +4.19 ± 0.27 | -1.85 ± 0.55 |
+| regiones_100 | +2.28 ± 0.74 | -0.41 ± 0.84 | +6.59 ± 0.58 | -2.69 ± 1.48 |
 
 ## 4. Variabilidad entre imágenes (bootstrap pareado de imágenes)
 
-No disponible: las corridas de la v3 no guardaron predicciones por imagen. Las corridas nuevas guardan `por_imagen.npz` y esta sección se rellena sola.
+- E4c − E3c, completa: +0.00 [IC 95 % +0.00, +0.00]
+- E4c − E3c, regiones: +0.63 [IC 95 % +0.47, +0.78]
+- E4c − E3c, cruda: -0.63 [IC 95 % -0.93, -0.31]
+- E4c − E3c, sin: +1.15 [IC 95 % +0.70, +1.59]
+- E4cd − E3cd, completa: -0.24 [IC 95 % -0.64, +0.16]
+- E4cd − E3cd, regiones: -0.21 [IC 95 % -0.59, +0.17]
+- E4cd − E3cd, cruda: +0.01 [IC 95 % -0.43, +0.45]
+- E4cd − E3cd, sin: +0.85 [IC 95 % +0.45, +1.26]
+- E3cd − E3c, completa: +0.46 [IC 95 % -0.06, +0.94]
+- E3cd − E3c, regiones: +2.00 [IC 95 % +1.44, +2.52]
+- E3cd − E3c, cruda: +3.71 [IC 95 % +3.05, +4.33]
+- E3cd − E3c, sin: +31.60 [IC 95 % +30.40, +32.60]
+- E4cd − E4c, completa: +0.22 [IC 95 % -0.30, +0.71]
+- E4cd − E4c, regiones: +1.16 [IC 95 % +0.57, +1.70]
+- E4cd − E4c, cruda: +4.35 [IC 95 % +3.68, +4.96]
+- E4cd − E4c, sin: +31.30 [IC 95 % +30.04, +32.42]
+- E4cf − E4c, completa: +0.00 [IC 95 % +0.00, +0.00]
+- E4cf − E4c, regiones: +0.02 [IC 95 % -0.00, +0.05]
+- E4cf − E4c, cruda: -0.13 [IC 95 % -0.19, -0.06]
+- E4cf − E4c, sin: +0.00 [IC 95 % +0.00, +0.00]
 
 ## 5. IoU por clase, profundidad completa (media de las semillas)
 
@@ -233,12 +429,21 @@ No disponible: las corridas de la v3 no guardaron predicciones por imagen. Las c
 | E7 | 0.001/aux 1 → 45.61, 0.001/aux 10 → 45.41, 0.001/aux 3 → 45.38 | 0.001 | sí |
 | E8 | 0.0003 → 45.31, 0.001 → 45.97, 0.003 → 46.58 | 0.003 | sí |
 | E2h | 0.0003 → 44.94, 0.001 → 46.04, 0.003 → 44.95 | 0.001 | no |
-| E2u | 0.0003 → 45.34, 0.001 → 46.93, 0.003 → 47.76 | 0.003 | sí |
+| E2u | 0.0003 → 45.34, 0.001 → 46.93, 0.003 → 47.76, 0.01 → 36.36 | 0.003 | no |
 | E9 | 0.0003 → 45.96, 0.001 → 45.85, 0.003 → 45.55 | 0.0003 | sí |
+| E10 | 0.0003 → 45.45, 0.001 → 46.76, 0.003 → 46.41 | 0.001 | no |
+| E11 | 0.0003 → 47.13, 0.001 → 47.05, 0.003 → 48.62, 0.01 → 42.97 | 0.003 | no |
+| E2c | 0.0003 → 45.94, 0.001 → 45.78, 0.003 → 46.38, 0.01 → 45.04 | 0.003 | no |
+| E3c | 0.0003 → 42.37, 0.001 → 42.15, 0.003 → 43.18, 0.01 → 42.86 | 0.003 | no |
+| E3cd | 0.0003 → 43.36, 0.001 → 43.68, 0.003 → 43.40 | 0.001 | no |
+| E4c | 0.0003 → 42.37, 0.001 → 42.15, 0.003 → 43.18, 0.01 → 42.86 | 0.003 | no |
+| E4cd | 0.0001 → 43.01, 0.0003 → 43.36, 0.001 → 42.46, 0.003 → 43.00 | 0.0003 | no |
+| E4cf | 0.0003 → 42.37, 0.001 → 42.15, 0.003 → 43.18, 0.01 → 42.86 | 0.003 | no |
+| E4cfd | 0.0001 → 43.01, 0.0003 → 43.36, 0.001 → 42.46, 0.003 → 43.00 | 0.0003 | no |
 
 ## 7. Combinaciones sin entrenar (complementarias, no forman parte de E1-E5)
 
-**E1 + E2** (`combinaciones/E1+E2/resultado.json`; interpolación probabilidades; elegido en la validación: mezcla_15_0.6, relleno_0.5, umbral 0.7)
+**E1 + E2** (`combinaciones\E1+E2\resultado.json`; interpolación probabilidades; elegido en la validación: mezcla_15_0.6, relleno_0.5, umbral 0.7)
 
 | variante | completa | regiones | sin |
 |---|---|---|---|
@@ -250,7 +455,44 @@ No disponible: las corridas de la v3 no guardaron predicciones por imagen. Las c
 
 Control, dos modelos de color: pares 46.55, 46.52, 46.74 (rango 46.52–46.74; pares solapados, no independientes).
 
-**E1u + E2u** (`combinaciones/E1u+E2u/resultado.json`; interpolación probabilidades; elegido en la validación: mezcla_15_0.6, relleno_0.5, umbral 0.7)
+**E1u + E10** (`combinaciones\E1u+E10\resultado.json`; interpolación probabilidades; elegido en la validación: mezcla_7_0.5, relleno_0.5, umbral 0.9)
+
+| variante | completa | regiones | sin |
+|---|---|---|---|
+| color | 47.27 ± 0.10 | 47.27 ± 0.10 | 47.27 ± 0.10 |
+| fusion | 49.17 ± 0.24 | 48.12 ± 0.38 | 39.20 ± 1.42 |
+| interruptor_0.9 | 49.17 ± 0.24 | 47.78 ± 0.26 | 47.27 ± 0.10 |
+| mezcla_7_0.5 | 49.36 ± 0.15 | 48.90 ± 0.20 | 47.27 ± 0.10 |
+| relleno_0.5 | 49.36 ± 0.15 | 49.15 ± 0.16 | 45.98 ± 0.19 |
+
+Control, dos modelos de color: pares 48.55, 48.41, 48.54 (rango 48.41–48.55; pares solapados, no independientes).
+
+**E1u + E11** (`combinaciones\E1u+E11\resultado.json`; interpolación probabilidades; elegido en la validación: mezcla_15_0.5, relleno_0.5, umbral 0.9)
+
+| variante | completa | regiones | sin |
+|---|---|---|---|
+| color | 47.27 ± 0.10 | 47.27 ± 0.10 | 47.27 ± 0.10 |
+| fusion | 50.98 ± 0.17 | 49.13 ± 0.03 | 15.77 ± 1.21 |
+| interruptor_0.9 | 50.98 ± 0.17 | 48.57 ± 0.17 | 47.27 ± 0.10 |
+| mezcla_15_0.5 | 52.12 ± 0.25 | 50.96 ± 0.18 | 47.27 ± 0.10 |
+| relleno_0.5 | 52.12 ± 0.25 | 51.88 ± 0.18 | 42.91 ± 0.42 |
+
+Control, dos modelos de color: pares 48.55, 48.41, 48.54 (rango 48.41–48.55; pares solapados, no independientes).
+
+**E1u + E11** (`combinaciones\E1u+E11\resultado_logits_E1u_lr0.001+E11_lr0.003.json`; interpolación logits; elegido en la validación: mezcla_15_0.5, relleno_0.5, umbral 0.9)
+
+| variante | completa | regiones | sin |
+|---|---|---|---|
+| color | 47.30 ± 0.11 | 47.30 ± 0.11 | 47.30 ± 0.11 |
+| fusion | 51.06 ± 0.16 | 49.20 ± 0.02 | 15.74 ± 1.20 |
+| interruptor_0.9 | 51.06 ± 0.16 | 48.62 ± 0.18 | 47.30 ± 0.11 |
+| mezcla_15_0.5 | 52.21 ± 0.24 | 51.01 ± 0.18 | 47.30 ± 0.11 |
+| relleno_0.5 | 52.21 ± 0.24 | 51.96 ± 0.18 | 43.28 ± 0.44 |
+| relleno_interruptor_0.3_0.5 | 52.21 ± 0.24 | 51.96 ± 0.18 | 47.30 ± 0.11 |
+
+Control, dos modelos de color: pares 48.58, 48.45, 48.58 (rango 48.45–48.58; pares solapados, no independientes).
+
+**E1u + E2u** (`combinaciones\E1u+E2u\resultado.json`; interpolación probabilidades; elegido en la validación: mezcla_15_0.6, relleno_0.5, umbral 0.7)
 
 | variante | completa | regiones | sin |
 |---|---|---|---|
@@ -262,7 +504,7 @@ Control, dos modelos de color: pares 46.55, 46.52, 46.74 (rango 46.52–46.74; p
 
 Control, dos modelos de color: pares 48.55, 48.41, 48.54 (rango 48.41–48.55; pares solapados, no independientes).
 
-**E1 + E2 (D-03)** (`combinaciones/resultado.json`; interpolación probabilidades; elegido en la validación: umbral 0.7, ventana 15)
+**E1 + E2 (D-03)** (`combinaciones\resultado.json`; interpolación probabilidades; elegido en la validación: umbral 0.7, ventana 15)
 
 | variante | completa | regiones | sin |
 |---|---|---|---|

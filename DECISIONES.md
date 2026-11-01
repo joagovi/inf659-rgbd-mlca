@@ -433,3 +433,87 @@ nada de lo que propone. Detalle y evidencia: `auditoria/` (01 a 07).
 - **IA.** Hizo la auditoría, encontró A2-A5, A8, A14 y A19 (`auditoria/01`), propuso los diseños, los umbrales y
   el criterio, y escribió el código, las pruebas y los documentos. No se cambió ni se reinterpretó ningún
   resultado guardado: las cifras de la v3 siguen en `runs/rgbd/` con sus identificadores originales.
+
+## Resultados de D-06 (familia «c», factorial 2×2 y control de la derivación)
+
+Medido del 2026-10-30 al 2026-11-01 (test, 3 semillas; `tools/cola_d06.sh`, reanudada tras un corte de energía
+sin repetir nada). **Predicciones del equipo:** no se escribieron; Joaquín decidió el 2026-11-01 abrir los
+resultados sin ellas. Las de la IA (`predicciones/D06_claude.md`) se contrastan en
+`predicciones/D06_claude_resultado.md`. Elegido en la validación por escenas: E2c 3e-3; E4c (y E3c, E4cf) 3e-3;
+E3cd 1e-3; E4cd (y E4cfd) 3e-4, tras probar 1e-4 por la regla del extremo (43.01 frente a 43.36).
+
+| Modelo | completa | cruda | aleatoria 10 / 30 / 50 % | regiones 0.25 / 0.5 / 0.75 / 1.0 | sin | ruido 10 / 20 / 50 cm |
+|---|---|---|---|---|---|---|
+| E1 (referencia) | 44.99 ± 0.30 | igual | igual | igual | igual | igual |
+| E2 (referencia) | 47.31 ± 0.26 | 46.97 | 46.66 / 44.82 / 43.90 | — / 46.58 / — / — | 42.25 ± 0.45 | 46.66 / 46.25 / 45.25 |
+| E2c | 47.53 ± 0.17 | 43.32 | 44.99 / 35.79 / 30.38 | 46.64 / 44.79 / 41.41 / 37.29 | 20.33 ± 2.48 | 44.61 / 42.96 / 39.26 |
+| E3c (derivado) | 44.99 ± 0.20 | 41.19 | 40.37 / 30.65 / 22.90 | 44.42 / 43.15 / 40.44 / 37.46 | 13.71 ± 5.13 | 42.17 / 40.60 / 35.82 |
+| E4c | 44.99 ± 0.20 | 40.56 | 40.37 / 30.65 / 23.36 | 44.53 / 43.77 / 42.06 / 39.74 | 14.86 ± 4.18 | 42.17 / 40.60 / 35.82 |
+| E4cf (derivado) | 44.99 ± 0.20 | 40.44 | 40.38 / 30.71 / 22.97 | 44.56 / 43.80 / 42.04 / 39.71 | 14.86 ± 4.18 | 42.17 / 40.60 / 35.82 |
+| E3cd | 45.45 ± 0.29 | 44.91 | 45.21 / 44.03 / 42.15 | 45.39 / 45.15 / 44.63 / 44.05 | 45.31 ± 0.25 | 45.03 / 44.63 / 43.61 |
+| E4cd | 45.21 ± 0.33 | 44.91 | 44.88 / 43.27 / 42.23 | 45.22 / 44.93 / 44.40 / 43.64 | 46.16 ± 0.26 | 44.88 / 44.63 / 43.80 |
+| E4cfd (derivado) | 45.21 ± 0.33 | 44.93 | 44.88 / 43.28 / 42.28 | 45.22 / 44.96 / 44.42 / 43.66 | 46.16 ± 0.26 | 44.88 / 44.63 / 43.80 |
+
+**Criterio** (`tools/criterio_d06.py`, Holm sobre cruda, regiones y sin; salida en `runs/rgbd/criterio_d06.txt`):
+
+| Contraste | cruda | regiones | sin |
+|---|---|---|---|
+| E4c − E3c (máscara, sin dropout) | −0.63, **perjudica** | +0.63, **aporta** | +1.15, no concluyente (semillas −1.13 / +10.67 / −6.10) |
+| E4cd − E3cd (máscara, con dropout) | +0.01, no aporta | −0.21, no aporta | +0.85, **aporta** (+0.80 / +0.81 / +0.93) |
+| E3cd − E3c (dropout, sin máscara) | +3.71, aporta | +2.00, aporta | +31.60, aporta |
+| E4cd − E4c (dropout, con máscara) | +4.35, aporta | +1.16, aporta | +31.30, aporta |
+| E3c − E2c (atención frente a suma) | −2.12, perjudica | −1.65, perjudica | −6.62, perjudica |
+
+- **MLCA en la cabeza no aprovecha la profundidad.** Con profundidad completa, E3c = E4c = 44.99, lo mismo que
+  E1, y 2.54 bajo E2c (E3c − E2c = −2.54 en completa). Con dropout, 45.21-45.45 (+0.2-0.5 sobre E1).
+- **La máscara binaria: ayuda con huecos grandes, perjudica con los del sensor.** Sin dropout, +0.63 en regiones
+  (+1.61 y +2.28 con 0.75 y 1.0) y −0.63 en cruda. Con dropout, ninguna diferencia salvo «sin» (+0.85); E4cd y
+  E3cd eligieron lr distintas (3e-4 y 1e-3), así que ese +0.85 no es solo la máscara.
+- **La robustez viene del entrenamiento, no de la máscara** (el criterio de `06_plan`): E3cd ≈ E4cd, y el dropout
+  no cuesta nada con profundidad completa (+0.46 y +0.22) y arregla también los huecos parciales (cruda +3.7 y
+  +4.4).
+- **E2c, más dependiente y más frágil que E2.** Con los rasgos corregidos, la suma gana solo +0.22 sobre E2 con
+  profundidad completa, pero con la cruda cae a 43.32 (E2: 46.97) y sin profundidad a 20.33 (E2: 42.25).
+- **Control de la derivación.** E3c entrenado de verdad (semilla 0): 44.48 en completa, frente a 45.19 del
+  derivado. La profundidad rellenada de entrenamiento no tiene ningún cero (comprobado: 0 de 795 imágenes), así
+  que la máscara no actúa al entrenar y la diferencia es el no determinismo de la GPU acumulado en 5940 pasos.
+  La derivación vale, pero diferencias menores de ~0.7 entre modelos entrenados por separado y con una semilla son
+  ruido.
+
+**Diagnósticos** (exploratorios, validación por escenas, semilla 0; `runs/rgbd/diagnosticos_d06_validacion.json`,
+con E2c añadido; la salida de la cola sin E2c queda en `diagnosticos_d06_validacion_cola.json`):
+
+- **Lo que suma MLCA es más constante que lo que suma la suma.** Parte de Δ que varía con la posición (1/8, 1/16,
+  1/32): E2c 0.86 / 0.78 / 0.79; E4c 0.41 / 0.56 / 0.29. En 1/32, el Δ de E4c mide 1.35 veces el rasgo de color.
+- **De ahí el colapso sin profundidad, con máscara o sin ella.** Quitando Δ solo en 1/32, E4c cae de 43.18 a
+  13.76 (en todas, 9.28); sin profundidad, coincide con E1 en el 10.3 % de los píxeles y pone el 92.4 % en tres
+  clases. E2c depende de la profundidad, pero repartida: quitando Δ en todas, 46.38 → 37.44.
+- **Con dropout, la cabeza deja de usar la fusión.** En E4cd, quitar Δ no cambia nada (43.36 → 43.50) y Δ es
+  pequeño (0.16 / 0.30 / 0.46 del rasgo de color): E4cd se comporta como un modelo de solo color, por eso da lo
+  mismo con profundidad o sin ella.
+
+**Prueba sin entrenar pendiente de D-05** (2026-10-30, logits, test): `relleno_interruptor` en
+`src/combinar.py` (relleno si la imagen tiene al menos `umbral` de profundidad válida; E1u si no; elegido en la
+validación: umbral 0.3, a = 0.5). Con E1u + E11: 52.21 ± 0.24 (completa), 51.77 (cruda), 52.22 / 52.23 / 52.21
+(aleatoria), 51.96 (regiones), **47.30 ± 0.11 (sin, igual que E1u)**, 50.52 / 49.44 / 47.09 (ruido). Es el mejor
+sistema medido: el relleno de D-05 sin su caída sin profundidad (42.91). Control, dos E1u: 48.53 ± 0.08. Son dos
+modelos (el doble de cómputo) y el umbral y a se eligieron entre 20 variantes en la validación.
+
+## D-07 · E11 robusto en un solo modelo; la MLCA, a la entrada del codificador
+
+**Fecha** 2026-11-01 · **Estado** 🟡 provisional · **Origen** Joaquín: «la idea es tener los mejores resultados»,
+con las predicciones de la IA como registro previo por ahora; decisiones delegadas en la IA.
+
+- **Lectura de D-06 que decide:** la MLCA en la cabeza está cerrada (no gana con profundidad completa y su máscara
+  no da robustez; la da el dropout), y la profundidad rinde dentro del codificador (E11: 51.06, +3.75 sobre E1u),
+  pero E11 se hunde sin ella (15.75).
+- **Decisión, en este orden:**
+  1. **E11d** = E11 + dropout 0.3 (generador propio: mismo orden de datos que E11 por semilla). Un solo modelo
+     que aspire a lo que hoy da el par E1u + E11. Solo dropout, sin huecos al entrenar: en D-06 el dropout ya
+     arregló los huecos parciales. Predicciones: `predicciones/D07_claude.md`.
+  2. **E2cd** = E2c + dropout 0.3: la suma con el mismo entrenamiento robusto que E4cd. Sin él, «MLCA + dropout
+     frente a suma» compara entrenamientos distintos.
+  3. **MLCA a la entrada de la última etapa del color** (donde E11 concatena), con y sin dropout: la versión de
+     la hipótesis del curso donde la profundidad rinde más. Requiere código nuevo (`rgbd.py`: hoy el codificador
+     solo admite concatenación) y pruebas.
+- Cada paso con sus predicciones escritas antes de lanzarlo.
