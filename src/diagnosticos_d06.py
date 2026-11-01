@@ -79,10 +79,11 @@ def por_dentro(modelo, datos, pos, ref=None):
                 cnt[c] = cnt.get(c, 0) + d.shape[0] * d.shape[2] * d.shape[3]
             for var, qs in quitar.items():
                 g = {**{k: s["f_color"][k] if k in qs else s["f_fusion"][k] for k in s["f_color"]}}
-                f = modelo.color(x) if var != "ninguna" else None
-                if f is not None:
-                    f.update(g)
-                    lg = rgbd.salida(modelo.evit.head, f)
+                if var != "ninguna":
+                    with autocast():                  # en bf16, como s; fuera de autocast la cabeza mezcla tipos
+                        f = modelo.color(x)
+                        f.update(g)
+                        lg = rgbd.salida(modelo.evit.head, f)
                 else:
                     lg = s["seg"]
                 pred = sumar(conf[var], lg, et)
