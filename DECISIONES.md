@@ -57,12 +57,12 @@ entrenar.
   de todas las condiciones; el test se evalúa una vez.
 - **E1u**: E1 con la última etapa de EfficientViT («stage4») entrenable, con una lr 10 veces menor que la de la
   cabeza y BN con sus estadísticas de ADE20K. Es la referencia justa para E7.
-- **E7** (profundidad como maestra; opción (c) de la tesis): E1u más una cabeza auxiliar que predice el log de la
+- **E7** (profundidad como maestra): E1u más una cabeza auxiliar que predice el log de la
   profundidad, copia de la cabeza de ADE20K con salida 1 iniciada en cero. Pérdida invariante a la escala de cada
   imagen (Eigen et al., 2014), porque el aumento amplía la imagen sin cambiar la profundidad. Se descarta al
   inferir: E7 no usa profundidad en el test. lr = la elegida para E1u; el peso de la pérdida auxiliar (1, 3, 10)
   se elige en la validación.
-- **E8** (fusión con respaldo en la salida; opción (b′) de la tesis): dos expertos sobre los mismos codificadores
+- **E8** (fusión con respaldo en la salida): dos expertos sobre los mismos codificadores
   congelados, la cabeza de color (como E1) y la de fusión (como E2), mezclados por píxel con
   α = σ(w·[m₁, m₅, m₁₅] + b)·m₁₅, donde m_k es la fracción válida en una ventana de k celdas (`rgbd.Compuerta`).
   Sin ninguna medida en la ventana grande, α = 0 y la salida es exactamente la del experto de color (comprobado:
