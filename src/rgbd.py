@@ -25,7 +25,10 @@ normalizadas por posición sin parámetros, como DeFM hace con sus salidas densa
 Dónde entra la profundidad (D-05): en todas, en los rasgos que lee la cabeza, después del codificador de color
 (que nunca la ve). Con `codificador` (E11, solo `concat`), la última etapa del color lee además f_1/16 + W'·P4,
 con W' propia (1×1, iniciada en cero), como la rectificación de CMX antes de la etapa siguiente; con W' = 0 es la
-misma red que sin ella.
+misma red que sin ella. Con `codificador="mlca"` (D-07: E3e, E4e, E3ed, E4ed), la última etapa lee en su lugar
+MLCA(f_1/16, P4, m), con la máscara de `preparar_mascara` en la rejilla de 1/16; la proyección de salida del bloque
+empieza en cero, así que al inicio también es la misma red. Las sumas de la cabeza siguen como en E11: respecto de
+E11 solo cambia cómo entra la profundidad al codificador.
 
 Opciones que no dependen de la fusión (D-03): `entrenable` deja ajustar etapas del codificador de color (E1u,
 E7, E2u, E9, E10, E11), y `aux_prof` añade una cabeza que predice la profundidad solo para entrenar (E7).
@@ -177,7 +180,9 @@ class RGBD(nn.Module):
         self.fusion, self.entrenable, self.codificador = fusion, tuple(entrenable), codificador
         if mascara not in ("fraccional", "binaria", "ninguna"):
             raise ValueError(mascara)
-        if fusion != "mlca" and mascara != "fraccional":
+        if codificador not in (False, True, "mlca"):
+            raise ValueError(f"codificador={codificador!r}: False, True (suma, E11) o «mlca» (D-07)")
+        if fusion != "mlca" and codificador != "mlca" and mascara != "fraccional":
             raise ValueError("la máscara solo se aplica a la fusión «mlca»")
         self.mascara, self.umbral = mascara, umbral     # D-06: E3 «ninguna», E4c «binaria», E4/E5/E4cf «fraccional»
         self.rasgos_prof, self.pares = rasgos_prof, RASGOS_PROF[rasgos_prof]
@@ -206,7 +211,9 @@ class RGBD(nn.Module):
                                           for c, d in self.pares})
                 for m in self.fus.values():
                     nn.init.zeros_(m.weight)
-                if codificador:             # E11: W' de la profundidad de 1/16 a la entrada de la última etapa
+                if codificador == "mlca":   # D-07: MLCA en lugar de W', con la salida iniciada en cero
+                    self.fus_cod = MLCA(c_rgb["stage3"], CANALES_PROF["P4"], cabezas=4)
+                elif codificador:           # E11: W' de la profundidad de 1/16 a la entrada de la última etapa
                     self.fus_cod = nn.Conv2d(CANALES_PROF["P4"], c_rgb["stage3"], 1, bias=False)
                     nn.init.zeros_(self.fus_cod.weight)
                 if fusion == "respaldo":                                # experto de color y compuerta
@@ -278,8 +285,13 @@ class RGBD(nn.Module):
         if self.defm is not None:
             with torch.no_grad():
                 fd = rasgos_defm(self.defm, prof_m, valida, self.rasgos_prof)
-            if self.codificador:            # E11: la última etapa del color también lee la profundidad
-                x = f["stage3"] + self.fus_cod(fd["P4"].to(f["stage3"].dtype))
+            if self.codificador:            # E11 y D-07: la última etapa del color también lee la profundidad
+                p4 = fd["P4"].to(f["stage3"].dtype)
+                if self.codificador == "mlca":
+                    m = preparar_mascara(validez_a_rasgos(valida, f["stage3"].shape[-2:]), self.mascara, self.umbral)
+                    x = self.fus_cod(f["stage3"], p4, m)
+                else:
+                    x = f["stage3"] + self.fus_cod(p4)
                 f["stage4"] = f["stage_final"] = self.etapa(4, x)
             g, ms = dict(f), {}
             for c, d in self.pares:

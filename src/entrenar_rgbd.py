@@ -72,7 +72,7 @@ class Exp:
     aux: tuple = ()                 # pesos de la pérdida auxiliar que se barren (E7)
     fijo: str = None                # experto de color ya entrenado (E9)
     rasgos: str = "p3p4p5"
-    codificador: bool = False
+    codificador: bool | str = False     # True: suma W'·P4 a la entrada de la última etapa (E11); «mlca»: MLCA (D-07)
     dropout: float = 0.0            # modality dropout: proporción de muestras sin ninguna profundidad
     huecos: bool = False            # rgbd.huecos_entrenamiento
     mascara: str = "fraccional"     # solo «mlca»
@@ -85,6 +85,7 @@ class Exp:
 
 
 _C = dict(rasgos="c3p4c5", gen_fallos=True, borde=True)          # familia corregida (D-06)
+_CE = dict(_C, codificador="mlca")                                 # MLCA en el codificador (D-07)
 EXPERIMENTOS = {
     # Diseño principal de la v3 (rasgos P3-P5 de la BiFPN: en 1/8 y 1/32 son constantes, D-05)
     "E1": Exp("rgb", historico=True, familia="principal v3", que="solo color"),
@@ -118,6 +119,15 @@ EXPERIMENTOS = {
     # D-07: E11 robusto en un solo modelo (generador propio de fallos: mismo orden de datos que E11 por semilla)
     "E11d": Exp("concat", ("stage4",), rasgos="c3p4c5", codificador=True, dropout=0.3, gen_fallos=True, borde=True,
                 familia="robusto D-07", que="E11 + dropout 0.3"),
+    # D-07: MLCA a la entrada de la última etapa del color, donde E11 suma W'·P4; las sumas de la cabeza, como E11
+    "E3e": Exp("concat", ("stage4",), mascara="ninguna", **_CE, familia="MLCA en el codificador D-07",
+               que="E11 con atención lineal sin máscara en el codificador"),
+    "E4e": Exp("concat", ("stage4",), mascara="binaria", **_CE, familia="MLCA en el codificador D-07",
+               que="E11 con MLCA (máscara binaria) en el codificador"),
+    "E3ed": Exp("concat", ("stage4",), mascara="ninguna", dropout=0.3, **_CE, familia="MLCA en el codificador D-07",
+                que="E3e + dropout 0.3"),
+    "E4ed": Exp("concat", ("stage4",), mascara="binaria", dropout=0.3, **_CE, familia="MLCA en el codificador D-07",
+                que="E4e + dropout 0.3"),
 }
 # Diccionarios de la v3, derivados del registro (los usan los demás scripts)
 FUSION = {e: c.fusion for e, c in EXPERIMENTOS.items()}
@@ -512,9 +522,10 @@ def equivalentes_en_entrenamiento(origen, destino):
     """¿Dan la misma trayectoria de entrenamiento? Solo si difieren únicamente en la máscara y la máscara no
     puede actuar al entrenar: sin dropout ni huecos todas las celdas valen 1 (profundidad rellenada sin ceros)
     con cualquier modo; con dropout, las muestras completas valen 1 y las quitadas 0 en «binaria» y en
-    «fraccional», pero no en «ninguna»."""
+    «fraccional», pero no en «ninguna». Vale igual para la MLCA del codificador (D-07)."""
     a, b = EXPERIMENTOS[origen], EXPERIMENTOS[destino]
-    if a.fusion != "mlca" or dataclasses.replace(a, mascara=b.mascara, familia=b.familia, que=b.que) != b:
+    if "mlca" not in (a.fusion, a.codificador) or dataclasses.replace(a, mascara=b.mascara, familia=b.familia,
+                                                                      que=b.que) != b:
         return False
     if a.huecos:
         return False

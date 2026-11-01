@@ -29,7 +29,7 @@ def iguales(a, b):
     return a.keys() == b.keys() and all(torch.equal(a[k], b[k]) for k in a)
 
 
-@pytest.mark.parametrize("exp", ["E1", "E2", "E4", "E5", "E2c", "E3c", "E3cd", "E4c", "E4cd", "E4cf", "E1u"])
+@pytest.mark.parametrize("exp", ["E1", "E2", "E4", "E5", "E2c", "E3c", "E3cd", "E4c", "E4cd", "E4cf", "E1u", "E4ed"])
 def test_cada_experimento_entrena_y_evalua(runs, exp):
     out = E.entrenar(exp, 1e-3, 0, epocas=1, pasos_max=2)
     conds = rgbd.CONDICIONES + ([] if E.EXPERIMENTOS[exp].historico else rgbd.CONDICIONES_EXTRA)
@@ -54,6 +54,15 @@ def test_e3_y_e4_se_entrenan_igual_sin_dropout(runs):
     assert not iguales(c["E3cd"], c["E4cd"])
     assert E.equivalentes_en_entrenamiento("E4c", "E3c") and E.equivalentes_en_entrenamiento("E4cd", "E4cfd")
     assert not E.equivalentes_en_entrenamiento("E4cd", "E3cd") and not E.equivalentes_en_entrenamiento("E4c", "E4cd")
+
+
+def test_e3e_y_e4e_se_entrenan_igual_sin_dropout(runs):
+    """D-07: lo mismo con la MLCA del codificador, que se entrena junto con la última etapa del color."""
+    for exp in ("E3e", "E4e"):
+        E.entrenar(exp, 1e-3, 0, epocas=2, pasos_max=4)
+    a, b = (cabeza(runs / E.nombre_corrida(e, 1e-3, 0)) for e in ("E3e", "E4e"))
+    assert iguales(a, b)
+    assert any(k.startswith("fus_cod.") for k in a) and any(k.startswith("evit.backbone.stages.3.") for k in a)
 
 
 def _lotes(monkeypatch, exp):

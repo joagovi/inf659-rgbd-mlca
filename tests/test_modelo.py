@@ -101,9 +101,50 @@ def test_con_profundidad_completa_e3_igual_a_e4(entrada):
     assert not torch.equal(a(x, p2, v2), b(x, p2, v2))
 
 
+@torch.no_grad()
+@pytest.mark.parametrize("exp", ["E11", "E4e"])
+def test_al_inicio_el_codificador_no_cambia_nada(entrada, exp):
+    """W' = 0 (E11) o la salida de MLCA = 0 (D-07): al inicio, la misma red que E10, que no toca el codificador."""
+    x, p, v = entrada
+    assert torch.equal(construir("E10")(x, p, v), construir(exp)(x, p, v))
+
+
+@torch.no_grad()
+@pytest.mark.parametrize("exp,ruta_de_color", [("E4e", True), ("E3e", False)])
+def test_sin_profundidad_la_mlca_del_codificador(entrada, exp, ruta_de_color):
+    """D-07: con cualquier peso de la MLCA del codificador y sin ninguna medida, con máscara la última etapa lee
+    exactamente los rasgos de color (las sumas de la cabeza, en cero, no añaden nada); sin máscara, no."""
+    x, p, v = entrada
+    m = construir(exp)
+    g = torch.Generator().manual_seed(1)
+    for q in m.fus_cod.parameters():
+        q.copy_(0.05 * torch.randn(q.shape, generator=g))
+    sin = m(x, torch.zeros_like(p), torch.zeros_like(v))
+    assert torch.equal(sin, rgbd.salida(m.evit.head, m.color(x))) == ruta_de_color
+    assert not torch.equal(m(x, p, v), sin)
+
+
+def test_e3e_y_e4e_son_la_misma_red():
+    a, b = construir("E3e"), construir("E4e")
+    sa, sb = a.state_dict(), b.state_dict()
+    assert sa.keys() == sb.keys() and all(torch.equal(sa[k], sb[k]) for k in sa)
+    assert any(k.startswith("fus_cod.q.") for k in sa)
+    assert (a.mascara, b.mascara, a.codificador, b.codificador) == ("ninguna", "binaria", "mlca", "mlca")
+    assert E.equivalentes_en_entrenamiento("E4e", "E3e")
+    assert not E.equivalentes_en_entrenamiento("E4ed", "E3ed") and not E.equivalentes_en_entrenamiento("E11", "E4e")
+
+
+@pytest.mark.parametrize("kw", [dict(fusion="mlca", codificador="mlca"), dict(fusion="concat", codificador="suma"),
+                                dict(fusion="concat", codificador=True, mascara="binaria")])
+def test_opciones_invalidas_del_codificador(kw):
+    with pytest.raises(ValueError):
+        rgbd.RGBD(**kw)
+
+
 @pytest.mark.parametrize("exp,esperado", [
     ("E1", {"evit.head"}), ("E2", {"evit.head", "fus"}), ("E4c", {"evit.head", "fus"}),
-    ("E1u", {"evit.head", "evit.backbone.stages.3"}), ("E2u", {"evit.head", "fus", "evit.backbone.stages.3"})])
+    ("E1u", {"evit.head", "evit.backbone.stages.3"}), ("E2u", {"evit.head", "fus", "evit.backbone.stages.3"}),
+    ("E4e", {"evit.head", "fus", "fus_cod", "evit.backbone.stages.3"})])
 def test_solo_se_entrena_lo_previsto(entrada, exp, esperado):
     x, p, v = entrada
     m = construir(exp)

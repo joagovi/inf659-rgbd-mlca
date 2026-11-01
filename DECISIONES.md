@@ -517,3 +517,12 @@ con las predicciones de la IA como registro previo por ahora; decisiones delegad
      la hipótesis del curso donde la profundidad rinde más. Requiere código nuevo (`rgbd.py`: hoy el codificador
      solo admite concatenación) y pruebas.
 - Cada paso con sus predicciones escritas antes de lanzarlo.
+- **Diseño del paso 3** (código del 2026-11-01): `codificador="mlca"` en `rgbd.RGBD`. **E4e** = E11 con MLCA
+  (máscara binaria, umbral 0.5, en la rejilla de 1/16) en lugar de W'·P4; las sumas de la cabeza, como E11, para
+  que respecto de E11 cambie una sola cosa. La salida del bloque empieza en cero (al inicio, la misma red que E10).
+  **E3e** (sin máscara) se deriva de E4e sin entrenar; **E4ed** = E4e + dropout 0.3; **E3ed** queda definido pero
+  fuera de la cola (solo si hace falta el factorial completo, unas 2 h). Comprobado antes de lanzar: E10, E11,
+  E11d y E4c dan salidas idénticas antes y después del cambio, y las huellas no cambian.
+- **Cola:** `tools/cola_d07.sh`. Paso 1: E11d y la prueba sin entrenar E1u + E11d; 2: E2cd; 3: E4e, E3e, E4ed;
+  4: tablas y criterio (`tools/criterio_d06.py` con los contrastes de D-07). Se pausó el 2026-11-01 a las 05:56,
+  a pedido de Joaquín, para escribir el código del paso 3; E11d se reanuda desde su último estado.

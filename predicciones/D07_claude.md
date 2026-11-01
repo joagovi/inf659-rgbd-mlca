@@ -55,3 +55,31 @@ el dropout enseña a la cabeza.
 | R5 | E2cd, sin | 45.5 [44.5, 46.5] |
 | R6 | E2cd, ruido_50cm | 44.0 [42.0, 45.5] |
 | R7 | E2cd − E4cd (suma frente a MLCA, los dos con dropout) | completa +1.8 [+0.8, +2.6]; cruda +1.5 [+0.2, +2.5]; sin −0.7 [−1.8, +0.4]. La suma gana con profundidad (~75 %); sin ella, empate o MLCA algo mejor |
+
+## E4e, E3e y E4ed (añadido el 2026-11-01, antes de lanzarlos y sin ningún resultado de E11d, E2cd ni E4e)
+
+**E4e** = E11 con MLCA (máscara binaria, umbral 0.5, en la rejilla de 1/16) en lugar de la suma W'·P4 a la
+entrada de la última etapa del color; las sumas de la cabeza, como en E11. **E3e** = E4e sin máscara (derivado sin
+entrenar: sin dropout, la máscara no actúa al entrenar). **E4ed** = E4e + dropout 0.3. Referencias: E10 (sin
+nada en el codificador) 49.24; E11 51.06 / 47.71 / 49.19 / 15.75 (completa / cruda / regiones / sin).
+
+**Por qué.** En E11 la profundidad del codificador es lo que más pesa (con la de otra imagen ahí, 51.06 → 31.09) y
+es una profundidad alineada posición a posición. MLCA no la puede dar: cada salida es una media de los valores de
+toda la imagen, elegida por contenido (D-06: en 1/16, solo el 56 % de su Δ varía con la posición, frente al 78 %
+de la suma). Espero que E4e quede entre E10 y E11, más cerca de E10.
+
+| # | Qué | Predicción |
+|---|---|---|
+| S1 | E4e, completa | 49.7 [48.8, 50.6]; E4e − E11 = −1.4 [−2.3, −0.5]; E4e ≥ E11 con ~10 % |
+| S2 | E3e − E4e en completa y ruido | 0.00 exacto (derivado; la máscara vale 1) |
+| S3 | E4e, cruda | 46.2 [44.5, 47.5]; E4e − E3e en cruda = −0.3 [−1.0, +0.4] (en D-06, −0.63) |
+| S4 | E4e − E3e, regiones | +0.4 [0.0, +1.0] (en D-06, +0.63) |
+| S5 | E4e, sin | 20 [8, 35]: colapsa como E11, sin dropout; E3e sin, 18 [6, 33] |
+| S6 | E4ed, completa | 49.2 [48.2, 50.2]; E4ed − E11d = −1.4 [−2.4, −0.4] |
+| S7 | E4ed, sin | 46.0 [44.8, 47.2]; E4ed − E11d en sin = −0.3 [−1.3, +0.7] |
+| S8 | E4ed, cruda | 48.0 [46.8, 49.3] |
+| S9 | lr | E4e, 3e-3 como E11 (~50 %); E4ed, 1e-3 o 3e-3 |
+| S10 | Conclusión | La MLCA no supera a la suma tampoco en el codificador: E4e < E11 y E4ed < E11d por más que el ruido (~0.7) |
+
+Me haría cambiar de idea: E4e ≥ E11 − 0.3 con profundidad completa (la atención sí aprovecha la profundidad donde
+más rinde), o E4ed > E11d sin profundidad por más de 1 (la máscara sí da robustez en el codificador).

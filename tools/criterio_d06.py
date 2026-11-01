@@ -2,6 +2,7 @@
 """Criterio de D-06 (auditoria/06_plan_experimentos.md) sobre los por_imagen.npz, sin GPU.
 
     python tools/criterio_d06.py
+    python tools/criterio_d06.py --contrastes E4e-E3e E4ed-E11d --condiciones completa cruda regiones sin   # D-07
 
 «Aporta» si la diferencia es > 0, su IC por remuestreo de imágenes excluye el 0 y el signo se repite en las 3
 semillas; «no aporta» si |diferencia| < 0.3 y el IC incluye el 0; si no, «no concluyente». Se añade
@@ -9,6 +10,7 @@ semillas; «no aporta» si |diferencia| < 0.3 y el IC incluye el 0; si no, «no 
 principales de cada contraste: el IC de cada condición usa el α de su posición en el orden de Holm.
 Uso de IA: escrito con asistencia de IA (Claude, Anthropic); ver DECISIONES.md.
 """
+import argparse
 import sys
 from pathlib import Path
 
@@ -37,14 +39,22 @@ def boot(a, b, cond, B=4000):
     return obs, d, min(1.0, 2 * min((d <= 0).mean(), (d >= 0).mean()))
 
 
-def main():
-    for a_, b_ in CONTRASTES:
+def main(argv=None):
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--contrastes", nargs="+", default=[f"{a}-{b}" for a, b in CONTRASTES], help="A-B")
+    ap.add_argument("--condiciones", nargs="+", default=list(CONDS))
+    args = ap.parse_args(argv)
+    for par in args.contrastes:
+        a_, b_ = par.split("-")
         a, b = E.cargar(RUNS, a_), E.cargar(RUNS, b_)
         if a is None or b is None:
             print(f"{a_} − {b_}: faltan corridas")
             continue
+        if not all((c / "por_imagen.npz").exists() for c in a["carpetas"] + b["carpetas"]):
+            print(f"{a_} − {b_}: una corrida histórica no tiene por_imagen.npz, se salta")
+            continue
         filas = []
-        for cond in CONDS:
+        for cond in args.condiciones:
             obs, d, p = boot(a, b, cond)
             ps = [ra[cond]["miou"] - rb.get(cond, rb["completa"])["miou"] for ra, rb in zip(a["res"], b["res"])]
             filas.append({"cond": cond, "dif": obs, "semillas": ps, "p": p, "d": d})

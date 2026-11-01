@@ -36,9 +36,23 @@ def test_intervalo_t_con_tres_semillas(tablas):
     assert abs(r["ic95"] - 4.303 * r["de"] / np.sqrt(3)) < 1e-12
 
 
+D06 = {  # los resultados de D-06 en DECISIONES.md, si ya se corrió la cola (2026-11-01)
+    ("E2c", "completa"): (47.53, 0.17), ("E4c", "cruda"): (40.56, 0.34), ("E3cd", "sin"): (45.31, 0.25),
+    ("E4cd", "sin"): (46.16, 0.26)}
+
+
 def test_factorial_pendiente_no_se_inventa():
-    md, _ = S.tablas(V3)
-    assert "Pendiente: faltan E3c, E4c, E3cd, E4cd" in md
+    """Sin las corridas de D-06, el factorial queda pendiente; con ellas, sale de los resultados y reproduce lo
+    publicado en DECISIONES.md (D-06)."""
+    md, t = S.tablas(V3)
+    if not any(V3.glob("E4cd_lr*_s0")):
+        assert "Pendiente: faltan E3c, E4c, E3cd, E4cd" in md
+        return
+    assert "Pendiente: faltan E3c, E4c, E3cd, E4cd" not in md
+    assert "| cruda | -0.63 ± 0.23 | +0.01 ± 0.17 | +3.71 ± 0.30 | +0.64 ± 0.05 |" in md
+    for (e, c), (media, de) in D06.items():
+        r = t["experimentos"][e]["condiciones"][c]
+        assert r["n"] == 3 and round(r["media"], 2) == media and round(r["de"], 2) == de, (e, c)
 
 
 def test_bootstrap_pareado(tmp_path):
