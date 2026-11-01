@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Coste computacional de la red completa, de extremo a extremo, para E1-E5 y las variantes de D-06.
+"""Coste computacional de la red completa, de extremo a extremo, para E1-E5 y las variantes de D-06 y D-07.
 
     python src/coste.py                          # en la GPU del equipo: bf16, lote 1, 480×640
     RGBD_SIN_PESOS=1 python src/coste.py --dispositivo cpu --precision fp32   # lo que se pudo medir al preparar D-06
+    python src/coste.py --exps E1u E10 E11 E11d E4e E4ed --sufijo _d07       # sin pisar la tabla anterior
 
 Para cada experimento: parámetros totales y entrenables; FLOPs por pasada (contados por
 `torch.utils.flop_counter.FlopCounterMode`, que cuenta 2 FLOPs por multiplicación-suma en convoluciones y
@@ -12,10 +13,11 @@ activaciones), desglosados en codificador de color, DeFM, fusión y cabeza; late
 pasadas tras `--calentamiento`; y memoria pico de la GPU. Los pesos no cambian el coste, así que con
 RGBD_SIN_PESOS=1 las cifras de FLOPs y parámetros son las mismas; la latencia en CPU no representa la de la GPU.
 
-Resultado: runs/coste/coste_<dispositivo>_<precisión>.json y .md. No usa NYUv2.
+Resultado: runs/coste/coste_<dispositivo>_<precisión><sufijo>.json y .md. No usa NYUv2.
 Uso de IA: escrito con asistencia de IA (Claude, Anthropic); ver `DECISIONES.md`.
 """
 import argparse
+import gc
 import json
 import statistics as st
 import sys
@@ -29,14 +31,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import procedencia  # noqa: E402
 import entrenar_rgbd as E  # noqa: E402
 
-EXPS = ("E1", "E2", "E4", "E5", "E2c", "E3c", "E4c", "E3cd", "E4cd", "E1u", "E2u")
-GRUPOS = {"color": "evit.backbone", "defm": "defm", "fusion": "fus", "cabeza": "evit.head"}
+EXPS = ("E1", "E2", "E4", "E5", "E2c", "E3c", "E4c", "E3cd", "E4cd", "E1u", "E2u", "E10", "E11", "E11d", "E4e",
+        "E4ed")
+GRUPOS = {"color": ("evit.backbone",), "defm": ("defm",), "fusion": ("fus", "fus_cod"), "cabeza": ("evit.head",)}
+
+
+def _de(nombre, prefijos):
+    return any(nombre == p or nombre.startswith(p + ".") for p in prefijos)
 
 
 def contar(modelo):
     tot = sum(p.numel() for p in modelo.parameters())
     ent = sum(p.numel() for p in modelo.parameters() if p.requires_grad)
-    por = {g: sum(p.numel() for n, p in modelo.named_parameters() if n.startswith(pref)) for g, pref in GRUPOS.items()}
+    por = {g: sum(p.numel() for n, p in modelo.named_parameters() if _de(n, pref)) for g, pref in GRUPOS.items()}
     return tot, ent, por
 
 
@@ -47,8 +54,7 @@ def flops(modelo, x, prof, valida):
     total = sum(cuentas["Global"].values())
     por = {}
     for g, pref in GRUPOS.items():         # los módulos de cada parte que se llamaron, sin contar dos veces
-        raiz = f"RGBD.{pref}"
-        claves = [k for k in cuentas if k == raiz or k.startswith(raiz + ".")]
+        claves = [k for k in cuentas if _de(k, [f"RGBD.{p}" for p in pref])]
         claves = [k for k in claves if not any(k.startswith(o + ".") for o in claves if o != k)]
         por[g] = sum(sum(cuentas[k].values()) for k in claves)
     return total, por
@@ -83,6 +89,7 @@ def main():
     ap.add_argument("--calentamiento", type=int, default=5)
     ap.add_argument("--repeticiones", type=int, default=30)
     ap.add_argument("--exps", nargs="+", default=list(EXPS))
+    ap.add_argument("--sufijo", default="", help="se añade al nombre del archivo (p. ej. _d07)")
     a = ap.parse_args()
     dev = a.dispositivo
     E.DEV = dev
@@ -101,6 +108,9 @@ def main():
         print(f"{exp}: {tot / 1e6:.2f} M ({ent / 1e6:.3f} M entrenables), {fl / 1e9:.2f} GFLOPs, "
               f"{lat:.1f} ± {de:.1f} ms" + (f", {pico:.0f} MiB" if pico else ""), flush=True)
         del modelo
+        gc.collect()                       # sin esto, la VRAM pico del siguiente incluye restos de este (D-07)
+        if dev.startswith("cuda"):
+            torch.cuda.empty_cache()
     out = {"dispositivo": dev, "precision": a.precision, "resolucion": [a.alto, a.ancho], "lote": a.lote,
            "repeticiones": a.repeticiones, "calentamiento": a.calentamiento, "entorno": procedencia.entorno(),
            "hilos_cpu": torch.get_num_threads(), "experimentos": filas,
@@ -108,7 +118,7 @@ def main():
                    "profundidad ya en memoria; incluye la codificación de DeFM y la máscara."}
     sal = E.sg.RAIZ / "runs" / "coste"
     sal.mkdir(parents=True, exist_ok=True)
-    nombre = f"coste_{dev.split(':')[0]}_{a.precision}"
+    nombre = f"coste_{dev.split(':')[0]}_{a.precision}{a.sufijo}"
     (sal / f"{nombre}.json").write_text(json.dumps(out, indent=1, ensure_ascii=False), encoding="utf-8")
     (sal / f"{nombre}.md").write_text(informe(out), encoding="utf-8")
     print(informe(out))
