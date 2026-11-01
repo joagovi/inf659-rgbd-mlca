@@ -37,3 +37,21 @@ ella, pero comparte esa capacidad entre los dos regímenes: espero un costo pequ
 
 Me haría cambiar de idea: E11d con profundidad completa más de 1.5 por debajo de E11 (el dropout sí cuesta en el
 codificador), o E11d sin profundidad por debajo de 44 (no aprendió a vivir sin ella).
+
+## E2cd (añadido el 2026-11-01, antes de lanzarlo y sin ningún resultado de E11d ni de E2cd)
+
+**E2cd** = E2c + modality dropout 0.3 (generador propio: mismo orden de datos que E2c por semilla). Referencias:
+E2c 47.53 / 43.32 / 44.79 / 30.38 / 20.33 / 39.26 (completa / cruda / regiones / aleatoria_50 / sin /
+ruido_50cm); E4cd 45.21 / 44.91 / 44.93 / 42.23 / 46.16 / 43.80; E3cd 45.45 / 44.91 / 45.15 / 42.15 / 45.31 /
+43.61. Sin máscara en la suma: sin profundidad, W·f_prof de una profundidad vacía es un desplazamiento fijo, que
+el dropout enseña a la cabeza.
+
+| # | Qué | Predicción |
+|---|---|---|
+| R1 | E2cd, completa | 47.0 [46.2, 47.8]; E2cd − E2c = −0.5 [−1.3, +0.3] |
+| R2 | E2cd, cruda | 46.4 [45.3, 47.3] |
+| R3 | E2cd, regiones | 46.6 [45.8, 47.3] |
+| R4 | E2cd, aleatoria_50 | 43.5 [41.0, 45.5] |
+| R5 | E2cd, sin | 45.5 [44.5, 46.5] |
+| R6 | E2cd, ruido_50cm | 44.0 [42.0, 45.5] |
+| R7 | E2cd − E4cd (suma frente a MLCA, los dos con dropout) | completa +1.8 [+0.8, +2.6]; cruda +1.5 [+0.2, +2.5]; sin −0.7 [−1.8, +0.4]. La suma gana con profundidad (~75 %); sin ella, empate o MLCA algo mejor |
