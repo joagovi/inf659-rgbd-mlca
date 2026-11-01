@@ -113,6 +113,9 @@ EXPERIMENTOS = {
     "E4cf": Exp("mlca", mascara="fraccional", **_C, familia="ablación c", que="MLCA, máscara fraccional"),
     "E4cfd": Exp("mlca", mascara="fraccional", dropout=0.3, **_C, familia="ablación c",
                  que="E4cf + dropout 0.3"),
+    # D-07: E11 robusto en un solo modelo (generador propio de fallos: mismo orden de datos que E11 por semilla)
+    "E11d": Exp("concat", ("stage4",), rasgos="c3p4c5", codificador=True, dropout=0.3, gen_fallos=True, borde=True,
+                familia="robusto D-07", que="E11 + dropout 0.3"),
 }
 # Diccionarios de la v3, derivados del registro (los usan los demás scripts)
 FUSION = {e: c.fusion for e, c in EXPERIMENTOS.items()}
