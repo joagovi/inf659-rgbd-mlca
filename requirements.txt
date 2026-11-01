@@ -15,5 +15,6 @@ ipykernel==7.3.0
 tqdm==4.70.0
 PyYAML==6.0.3
 pytest==9.2.0      # pruebas (D-06)
+pandas==3.0.5      # cuaderno 12 (D-07)
 # DeFM: código en leggedrobotics/defm@4849a368d669ae5d34bcd612fa3620f0e8a7ab83 (src/procedencia.py)
 # EfficientViT: third_party/efficientvit en de7d773
