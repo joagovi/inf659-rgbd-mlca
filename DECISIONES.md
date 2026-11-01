@@ -538,17 +538,20 @@ probar 1e-4 por la regla del extremo (44.67 / 45.62 / 45.05 / 45.56 con 1e-4 / 3
 
 | Modelo | completa | cruda | aleatoria 10 / 30 / 50 % | regiones 0.25 / 0.5 / 0.75 / 1.0 | sin | ruido 10 / 20 / 50 cm |
 |---|---|---|---|---|---|---|
-| E1u (referencia) | 47.30 ± 0.11 | igual | igual | igual | igual | igual |
-| E11 (referencia, D-05) | 51.06 ± 0.16 | 47.71 | — / — / 33.39 | — / 49.19 / — / — | 15.75 ± 1.21 | — / — / 39.54 |
+| E1u (referencia) | 47.31 ± 0.10 | igual | igual | igual | igual | igual |
+| E11 (referencia, D-05) | 51.06 ± 0.16 | 47.71 | 48.48 / 39.46 / 33.39 | — / 49.19 / — / — | 15.75 ± 1.21 | 47.73 / 45.40 / 39.54 |
 | **E11d** | **51.26 ± 0.35** | **50.41** | 50.37 / 47.06 / 45.48 | 51.07 / 50.57 / 49.65 / 48.31 | **47.43 ± 0.18** | 50.04 / 49.17 / 47.43 |
 | E2cd | 48.05 ± 0.28 | 47.66 | 47.43 / 45.30 / 44.58 | 47.81 / 47.26 / 46.27 / 45.43 | 45.47 ± 0.20 | 47.26 / 46.79 / 45.58 |
 | E4e | 49.39 ± 0.52 | 47.78 | 47.58 / 42.65 / 39.37 | 49.15 / 48.31 / 46.62 / 44.66 | 38.75 ± 1.05 | 47.74 / 46.62 / 43.70 |
 | E3e (derivado) | 49.39 ± 0.52 | 47.68 | 47.58 / 42.65 / 39.16 | 49.11 / 48.16 / 46.13 / 43.76 | 29.36 ± 1.80 | 47.74 / 46.62 / 43.70 |
 | E4ed | 49.24 ± 0.11 | 48.49 | 48.32 / 45.43 / 44.10 | 49.07 / 48.60 / 47.78 / 47.00 | 47.29 ± 0.09 | 48.18 / 47.40 / 45.95 |
 
-**Prueba sin entrenar E1u + E11d** (`src/combinar.py`, logits, test): el interruptor y la mezcla no superan a
-E11d solo (interruptor 51.26 completa, 49.27 cruda, 47.30 sin); `relleno_interruptor` (umbral 0.3, a = 0.5),
-50.65 / 50.60 / 47.30. E11d ya no necesita respaldo.
+**Prueba sin entrenar E1u + E11d** (`src/combinar.py`, logits, test; elegido en la validación,
+`relleno_interruptor` con umbral 0.3 y a = 0.5): 50.65 completa, 50.60 cruda, 50.46 regiones, 50.68 con el 30 y
+el 50 % aleatorio, 48.64 con ruido de 50 cm, 47.30 sin. Frente a E11d solo: con profundidad completa o con los
+huecos del sensor, combinar no aporta (−0.61 y +0.18); con huecos aleatorios del 30-50 % o ruido fuerte, sí
+(+3.62, +5.20 y +1.22), a costa de un segundo modelo. Con E11d, promediar con E1u baja la cifra con profundidad
+completa (51.26 → 50.65), al revés que con E11 (51.06 → 52.21).
 
 **Criterio** (`tools/criterio_d06.py`, Holm sobre completa, cruda, regiones y sin; `runs/rgbd/criterio_d07.txt`):
 
@@ -559,15 +562,31 @@ E11d solo (interruptor 51.26 completa, 49.27 cruda, 47.30 sin); `relleno_interru
 | E2cd − E4cd (suma frente a MLCA en la cabeza, con dropout) | +2.83, aporta | +2.75, aporta | +2.33, aporta | −0.69, perjudica |
 | E2cd − E2c (dropout, suma en la cabeza) | +0.52, no concluyente | +4.35, aporta | +2.47, aporta | +25.14, aporta |
 
-- **E11d es el mejor modelo único y no necesita respaldo.** El dropout no cuesta nada con profundidad completa
-  (+0.20 sobre E11) y sin profundidad pasa de 15.75 a 47.43 (E1u: 47.30). Frente al par E1u + E11 con
-  `relleno_interruptor` (dos modelos): −0.95 en completa, −1.36 en cruda, +0.13 sin. Solo queda bajo E1u con el
-  50 % de la profundidad borrada al azar (45.48).
-- **El dropout sale gratis en todas las variantes.** Con la suma en la cabeza: +0.52 en completa (no
-  concluyente), +4.35 en cruda, +25.1 sin. Igual que en D-06 con la MLCA.
-- **La suma gana a la MLCA dondequiera que entre la profundidad**: en la cabeza (+2.8 con dropout) y en el
-  codificador (+2.0 con dropout; sin dropout, E11 − E4e = +1.67 en completa). La MLCA solo empata o gana sin
-  profundidad (−0.14 y −0.69 a favor de la MLCA).
-- **En el codificador, la máscara sí da robustez sin dropout**: E4e − E3e = +9.4 sin profundidad, y E4e (38.75)
-  queda muy por encima de E11 (15.75) sin dropout. Pero el dropout da más (47.29) y entonces la máscara no
-  importa; queda como el único efecto positivo de la máscara binaria en todo el estudio, útil para el curso.
+- **E11d es el mejor modelo único.** El dropout no cuesta nada con profundidad completa (+0.20 sobre E11, dentro
+  del ruido) y sin profundidad pasa de 15.75 a 47.43 (E1u: 47.31). Supera a E1u en todas las condiciones salvo
+  con huecos aleatorios del 30 y el 50 % (−0.25 y −1.83). Frente al par E1u + E11 con `relleno_interruptor` (dos
+  modelos): −0.95 en completa, −1.36 en cruda, +0.13 sin; esa ventaja del par es del tamaño de lo que da
+  promediar dos E1u (+1.22: 48.53 frente a 47.31).
+- **El dropout sale gratis en todas las variantes.** Con profundidad completa: E11d − E11 = +0.20, E4ed − E4e =
+  −0.15, E2cd − E2c = +0.52 (no concluyente; con lr distintas, 3e-4 y 3e-3), como en D-06 (+0.46 y +0.22). Con la
+  suma en la cabeza arregla los huecos y la ausencia: +4.35 en cruda, +25.1 sin.
+- **Con profundidad completa, la suma gana a la MLCA en los dos lugares**: en la cabeza (E2cd − E4cd = +2.83 con
+  dropout; en D-06, E2c − E3c = +2.54 sin él) y en el codificador (E11 − E4e = +1.67 sin dropout, las 3 semillas;
+  E11d − E4ed = +2.02 con él).
+- **Sin dropout, en el codificador la MLCA cambia precisión por robustez.** E4e − E11 (medias de 3 semillas; sin
+  bootstrap, porque E11 es histórico y no tiene `por_imagen.npz`): −1.67 completa, −0.90 con el 10 % aleatorio,
+  +0.06 cruda, +3.19 y +5.98 con el 30 y el 50 %, +1.23 y +4.16 con ruido de 20 y 50 cm, +23.0 sin. Casi todo
+  viene de la atención, no de la máscara (E3e − E11 da lo mismo, salvo sin: +13.6): un resumen global de la
+  profundidad aprovecha menos una profundidad buena y se degrada menos con una mala. En la cabeza (D-06) no pasaba:
+  E3c quedó bajo E2c en todas las condiciones salvo regiones del 100 % (+0.17, empate).
+- **Con dropout, esa ventaja desaparece**: E4ed − E11d = −1.9 a −2.0 con profundidad y −0.14 sin ella (no
+  aporta). El dropout le da a la suma la robustez sin quitarle precisión.
+- **La máscara binaria en el codificador** solo actúa con huecos grandes o sin profundidad (E4e − E3e: +0.10
+  cruda, +0.15 regiones, +0.90 con regiones del 100 %, +9.39 sin). Es su efecto más grande del estudio (en D-06,
+  +0.63 en regiones sin dropout y +0.85 sin profundidad con dropout). Con dropout no se midió en el codificador
+  (E3ed quedó fuera de la cola).
+
+*Revisado el 2026-11-01 (segunda lectura): se corrigieron la lectura de la prueba sin entrenar (sí ayuda con
+huecos aleatorios y ruido fuerte), el sentido atribuido a −0.14 sin profundidad (favorece a la suma), la referencia
+de E1u (47.31, la publicada) y la comparación sin dropout en el codificador. La versión anterior queda en el
+commit 3f30edd.*
