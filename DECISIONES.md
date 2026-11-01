@@ -526,3 +526,48 @@ con las predicciones de la IA como registro previo por ahora; decisiones delegad
 - **Cola:** `tools/cola_d07.sh`. Paso 1: E11d y la prueba sin entrenar E1u + E11d; 2: E2cd; 3: E4e, E3e, E4ed;
   4: tablas y criterio (`tools/criterio_d06.py` con los contrastes de D-07). Se pausó el 2026-11-01 a las 05:56,
   a pedido de Joaquín, para escribir el código del paso 3; E11d se reanuda desde su último estado.
+
+## Resultados de D-07 (E11d, E2cd y la MLCA en el codificador)
+
+Medido el 2026-11-01 (test, 3 semillas; `tools/cola_d07.sh`, pausada de 05:56 a 06:26 a pedido de Joaquín y
+reanudada sin repetir nada). Sin predicciones del equipo (decisión de Joaquín del 2026-11-01); las de la IA
+(`predicciones/D07_claude.md`) se contrastan en `predicciones/D07_claude_resultado.md`. Elegido en la validación
+por escenas (completa, semilla 0): E11d 1e-3 (47.02 / 47.76 / 47.61 con 3e-4 / 1e-3 / 3e-3); E2cd 3e-4, tras
+probar 1e-4 por la regla del extremo (44.67 / 45.62 / 45.05 / 45.56 con 1e-4 / 3e-4 / 1e-3 / 3e-3); E4e (y E3e)
+1e-3 (46.24 / 49.42 / 47.83); E4ed 1e-3 (45.55 / 47.10 / 39.39).
+
+| Modelo | completa | cruda | aleatoria 10 / 30 / 50 % | regiones 0.25 / 0.5 / 0.75 / 1.0 | sin | ruido 10 / 20 / 50 cm |
+|---|---|---|---|---|---|---|
+| E1u (referencia) | 47.30 ± 0.11 | igual | igual | igual | igual | igual |
+| E11 (referencia, D-05) | 51.06 ± 0.16 | 47.71 | — / — / 33.39 | — / 49.19 / — / — | 15.75 ± 1.21 | — / — / 39.54 |
+| **E11d** | **51.26 ± 0.35** | **50.41** | 50.37 / 47.06 / 45.48 | 51.07 / 50.57 / 49.65 / 48.31 | **47.43 ± 0.18** | 50.04 / 49.17 / 47.43 |
+| E2cd | 48.05 ± 0.28 | 47.66 | 47.43 / 45.30 / 44.58 | 47.81 / 47.26 / 46.27 / 45.43 | 45.47 ± 0.20 | 47.26 / 46.79 / 45.58 |
+| E4e | 49.39 ± 0.52 | 47.78 | 47.58 / 42.65 / 39.37 | 49.15 / 48.31 / 46.62 / 44.66 | 38.75 ± 1.05 | 47.74 / 46.62 / 43.70 |
+| E3e (derivado) | 49.39 ± 0.52 | 47.68 | 47.58 / 42.65 / 39.16 | 49.11 / 48.16 / 46.13 / 43.76 | 29.36 ± 1.80 | 47.74 / 46.62 / 43.70 |
+| E4ed | 49.24 ± 0.11 | 48.49 | 48.32 / 45.43 / 44.10 | 49.07 / 48.60 / 47.78 / 47.00 | 47.29 ± 0.09 | 48.18 / 47.40 / 45.95 |
+
+**Prueba sin entrenar E1u + E11d** (`src/combinar.py`, logits, test): el interruptor y la mezcla no superan a
+E11d solo (interruptor 51.26 completa, 49.27 cruda, 47.30 sin); `relleno_interruptor` (umbral 0.3, a = 0.5),
+50.65 / 50.60 / 47.30. E11d ya no necesita respaldo.
+
+**Criterio** (`tools/criterio_d06.py`, Holm sobre completa, cruda, regiones y sin; `runs/rgbd/criterio_d07.txt`):
+
+| Contraste | completa | cruda | regiones | sin |
+|---|---|---|---|---|
+| E4e − E3e (máscara en el codificador, sin dropout) | 0.00, no aporta | +0.10, no aporta | +0.15, **aporta** | +9.39, **aporta** |
+| E4ed − E11d (MLCA frente a suma en el codificador, con dropout) | −2.02, **perjudica** | −1.92, **perjudica** | −1.97, **perjudica** | −0.14, no aporta |
+| E2cd − E4cd (suma frente a MLCA en la cabeza, con dropout) | +2.83, aporta | +2.75, aporta | +2.33, aporta | −0.69, perjudica |
+| E2cd − E2c (dropout, suma en la cabeza) | +0.52, no concluyente | +4.35, aporta | +2.47, aporta | +25.14, aporta |
+
+- **E11d es el mejor modelo único y no necesita respaldo.** El dropout no cuesta nada con profundidad completa
+  (+0.20 sobre E11) y sin profundidad pasa de 15.75 a 47.43 (E1u: 47.30). Frente al par E1u + E11 con
+  `relleno_interruptor` (dos modelos): −0.95 en completa, −1.36 en cruda, +0.13 sin. Solo queda bajo E1u con el
+  50 % de la profundidad borrada al azar (45.48).
+- **El dropout sale gratis en todas las variantes.** Con la suma en la cabeza: +0.52 en completa (no
+  concluyente), +4.35 en cruda, +25.1 sin. Igual que en D-06 con la MLCA.
+- **La suma gana a la MLCA dondequiera que entre la profundidad**: en la cabeza (+2.8 con dropout) y en el
+  codificador (+2.0 con dropout; sin dropout, E11 − E4e = +1.67 en completa). La MLCA solo empata o gana sin
+  profundidad (−0.14 y −0.69 a favor de la MLCA).
+- **En el codificador, la máscara sí da robustez sin dropout**: E4e − E3e = +9.4 sin profundidad, y E4e (38.75)
+  queda muy por encima de E11 (15.75) sin dropout. Pero el dropout da más (47.29) y entonces la máscara no
+  importa; queda como el único efecto positivo de la máscara binaria en todo el estudio, útil para el curso.
