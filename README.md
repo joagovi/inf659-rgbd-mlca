@@ -17,6 +17,10 @@ Final project of *Deep Learning INF659* (MSc in Computer Science, Pontificia Uni
 
 ![Architecture](proposal/figs/arquitectura_mlca_en.png)
 
+All the architectures we tested, and what changes in each experiment: [`ARQUITECTURAS.md`](ARQUITECTURAS.md)
+(Spanish), with English figures: [main](proposal/figs/arquitecturas_principales_en.png) and
+[complementary](proposal/figs/arquitecturas_complementarias_en.png).
+
 ## Preliminary results (NYUv2, 40 classes, test, 3 seeds)
 
 Frozen extractors; only the fusion and the EfficientViT head are trained. Predictions were written before
@@ -102,21 +106,24 @@ src/
   nyuv2.py             NYUv2 reader (official .mat, raw and filled depth, 40 classes)
   entrenar_rgbd.py     training and evaluation protocol
   efficientvit_seg.py  EfficientViT-Seg loader with the official weights
+  procedencia.py       pinned DeFM commit, checkpoint SHA-256 and environment, stored in every result (D-06)
+  estadistica.py       statistics from the result files: mean ± SD, t intervals, paired differences, image bootstrap
+  coste.py             parameters, FLOPs, end-to-end latency and peak VRAM of the full network
+  diagnosticos_d06.py  MLCA diagnostics on the scene-level validation split
 notebooks/
   09_mlca_bloque       the block on synthetic data: exact RGB path, exact hole exclusion, linear cost
   10_nyuv2_huecos      the real holes of NYUv2 raw depth: how many, where, which classes, which scale
   11_e1_e2_nyuv2       results of E1 and E2
   12_resultados        results of D-06 and D-07: all tables, robustness figure, criterion, mechanism, cost
-  procedencia.py       pinned DeFM commit, checkpoint SHA-256 and environment, stored in every result (D-06)
-  estadistica.py       statistics from the result files: mean ± SD, t intervals, paired differences, image bootstrap
-  coste.py             parameters, FLOPs, end-to-end latency and peak VRAM of the full network
-  diagnosticos_d06.py  MLCA diagnostics on the scene-level validation split
-tests/         104 automated tests (CPU with synthetic data and random weights; 2 GPU-only)
+tests/         106 automated tests (CPU with synthetic data and random weights; 2 GPU-only)
 auditoria/     D-06 audit: findings, coherence matrix, v2/v3 comparison, DeFM report, tables, plan, verification
 DECISIONES.md  decisions and predictions written before each experiment
-predicciones/  the AI's predictions for D-06 and D-07, written before each run, and how they compared
+ARQUITECTURAS.md  diagrams of every tested architecture and the catalog of experiments with their results
+predicciones/  predictions for D-06 to D-08 (the AI's; for D-08 also the team's), written before each run, and
+               how they compared
 tools/         verificar_defm.py, huecos_efectivos.py, reproducir_historicos.py, cola_d06.sh, cola_d07.sh,
-               criterio_d06.py (pre-registered criterion), run_notebook.py
+               cola_d08.sh, criterio_d06.py (pre-registered criterion), figura_arquitecturas.py,
+               catalogo_experimentos.py, run_notebook.py
 ```
 
 Code and notebooks are documented in Spanish.
