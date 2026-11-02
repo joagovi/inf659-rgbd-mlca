@@ -33,11 +33,13 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[1]
 
 DEFM_COMMIT = "4849a368d669ae5d34bcd612fa3620f0e8a7ab83"      # leggedrobotics/defm, 2026-10-26
-DEFM_HF_REPO, DEFM_HF_REVISION = "leggedrobotics/defm", None    # None: la que haya; se registra el SHA-256
+# Revisiones de Hugging Face y SHA-256 de los checkpoints que usaron todas las corridas de la v3 a D-08 (los mismos
+# en cada resultado.json; fijados el 2026-11-02). Con None se baja la revisión que haya y no se comprueba nada.
+DEFM_HF_REPO, DEFM_HF_REVISION = "leggedrobotics/defm", "b6c9eb68ac833ccd93bf2571279235cb9b065251"
 EVIT_COMMIT = "de7d773"                                         # third_party/efficientvit (README)
-EVIT_HF_REPO, EVIT_HF_REVISION = "han-cai/efficientvit-seg", None
-# Se rellenan con el resultado de `tools/verificar_defm.py` en la máquina del equipo (pendiente, D-06).
-SHA256_ESPERADO = {"defm_resnet18.pth": None, "efficientvit_seg_b1_ade20k.pt": None}
+EVIT_HF_REPO, EVIT_HF_REVISION = "han-cai/efficientvit-seg", "cf3ccaf9cbaf670a2cb283612773546824ca0aa1"
+SHA256_ESPERADO = {"defm_resnet18.pth": "781d61dda55a789f445f23445cf7cba5d83693e3cc002281245240c523b56a44",
+                   "efficientvit_seg_b1_ade20k.pt": "59cca6a7ff4d1a6494b7f12072c6a68fee40ef401e971f26af01a2e0f3c8f5e7"}
 
 _REGISTRO = {}          # archivo -> {ruta, sha256, bytes}; lo leen las corridas para su resultado.json
 
