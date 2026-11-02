@@ -23,8 +23,10 @@ Protocolo, igual para todos los experimentos:
   la máscara. El dropout y los huecos usan un generador propio, así que el orden de los datos y el aumento son
   los mismos con y sin dropout.
 - Entrenamiento con la profundidad rellenada (`depths`); en E5, E3cd, E4cd y E4cfd, el 30 % de las muestras sin
-  profundidad; en E8, E2h y E9, huecos por muestra (`rgbd.huecos_entrenamiento`). Aumento en la GPU: escala
-  U(1, 1.5) con recorte aleatorio de 480×640 y volteo horizontal.
+  profundidad; en E8, E2h y E9, huecos por muestra (`rgbd.huecos_entrenamiento`). En E11r, E3er y E4er (D-08),
+  la profundidad cruda del sensor (`rawDepths`), con sus huecos reales: la máscara actúa al entrenar. La
+  validación y el test se evalúan igual en todos. Aumento en la GPU: escala U(1, 1.5) con recorte aleatorio de
+  480×640 y volteo horizontal (la profundidad, con el vecino más cercano: los huecos siguen siendo ceros).
 - AdamW (decaimiento 0.01), lote 8, 100 pasos de calentamiento y caída polinómica (0.9); bf16 en la GPU.
 - Sin selección de época: se evalúa el modelo final. La lr se elige en una validación del 15 % de las escenas de
   entrenamiento (`nyuv2.validacion_por_escenas`), nunca en el test. En E7 se usa la lr elegida para E1u y se
@@ -74,7 +76,7 @@ class Exp:
     rasgos: str = "p3p4p5"
     codificador: bool | str = False     # True: suma W'·P4 a la entrada de la última etapa (E11); «mlca»: MLCA (D-07)
     dropout: float = 0.0            # modality dropout: proporción de muestras sin ninguna profundidad
-    huecos: bool = False            # rgbd.huecos_entrenamiento
+    huecos: bool | str = False      # True: rgbd.huecos_entrenamiento (D-03); «cruda»: la del sensor (D-08)
     mascara: str = "fraccional"     # solo «mlca»
     umbral: float = 0.5             # máscara binaria: celda válida si su fracción válida supera el umbral
     gen_fallos: bool = False        # dropout y huecos con un generador propio (D-06)
@@ -128,6 +130,14 @@ EXPERIMENTOS = {
                 que="E3e + dropout 0.3"),
     "E4ed": Exp("concat", ("stage4",), mascara="binaria", dropout=0.3, **_CE, familia="MLCA en el codificador D-07",
                 que="E4e + dropout 0.3"),
+    # D-08: E11d, E3ed y E4ed entrenados con la profundidad cruda del sensor, con sus huecos reales (la máscara
+    # actúa al entrenar, así que E3er ya no se deriva de E4er); el orden de los datos y el dropout no cambian
+    "E11r": Exp("concat", ("stage4",), rasgos="c3p4c5", codificador=True, dropout=0.3, huecos="cruda",
+                gen_fallos=True, borde=True, familia="huecos reales D-08", que="E11d entrenado con la cruda"),
+    "E3er": Exp("concat", ("stage4",), mascara="ninguna", dropout=0.3, huecos="cruda", **_CE,
+                familia="huecos reales D-08", que="E3ed entrenado con la cruda"),
+    "E4er": Exp("concat", ("stage4",), mascara="binaria", dropout=0.3, huecos="cruda", **_CE,
+                familia="huecos reales D-08", que="E4ed entrenado con la cruda"),
 }
 # Diccionarios de la v3, derivados del registro (los usan los demás scripts)
 FUSION = {e: c.fusion for e, c in EXPERIMENTOS.items()}
@@ -356,6 +366,8 @@ def _entrenar(exp, cfg, lr, semilla, epocas, lote, validacion, humo, aux, nombre
     # D-06: dropout y huecos con su propio generador, para que no cambien el orden de los datos ni el aumento
     gen_f = torch.Generator().manual_seed(semilla + 1_000_003) if cfg.gen_fallos else gen
     tr_datos = nyuv2.cache("entrenamiento")
+    # D-08: con «cruda», los lotes de entrenamiento traen la profundidad del sensor; la evaluación no cambia
+    datos_ent = dict(tr_datos, prof=tr_datos["cruda"]) if cfg.huecos == "cruda" else tr_datos
     if validacion:
         pos_tr, pos_ev = nyuv2.validacion_por_escenas()
         ev_datos, condiciones = tr_datos, ["completa"]
@@ -415,11 +427,11 @@ def _entrenar(exp, cfg, lr, semilla, epocas, lote, validacion, humo, aux, nombre
         if orden is None:
             orden, k0 = pos_tr[torch.randperm(len(pos_tr), generator=gen).numpy()], 0
         for k in range(k0, len(orden) - lote + 1, lote):
-            rgb, prof, et = aumentar(*lote_a_gpu(tr_datos, orden[k:k + lote]), gen)
+            rgb, prof, et = aumentar(*lote_a_gpu(datos_ent, orden[k:k + lote]), gen)
             if cfg.dropout:                         # la muestra pierde toda la profundidad, como «sin»
                 quita = torch.rand(len(prof), generator=gen_f) < cfg.dropout
                 prof = torch.where(quita.to(DEV)[:, None, None, None], torch.zeros_like(prof), prof)
-            if cfg.huecos:
+            if cfg.huecos is True:
                 prof = rgbd.huecos_entrenamiento(prof, gen_f)
             with autocast():
                 sal = modelo(normalizar_rgb(rgb), prof / 1e3, prof > 0, todo=True)
@@ -522,7 +534,8 @@ def equivalentes_en_entrenamiento(origen, destino):
     """¿Dan la misma trayectoria de entrenamiento? Solo si difieren únicamente en la máscara y la máscara no
     puede actuar al entrenar: sin dropout ni huecos todas las celdas valen 1 (profundidad rellenada sin ceros)
     con cualquier modo; con dropout, las muestras completas valen 1 y las quitadas 0 en «binaria» y en
-    «fraccional», pero no en «ninguna». Vale igual para la MLCA del codificador (D-07)."""
+    «fraccional», pero no en «ninguna». Vale igual para la MLCA del codificador (D-07). Con huecos al entrenar,
+    simulados o los del sensor (D-08), nunca."""
     a, b = EXPERIMENTOS[origen], EXPERIMENTOS[destino]
     if "mlca" not in (a.fusion, a.codificador) or dataclasses.replace(a, mascara=b.mascara, familia=b.familia,
                                                                       que=b.que) != b:

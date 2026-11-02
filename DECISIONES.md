@@ -590,3 +590,31 @@ completa (51.26 → 50.65), al revés que con E11 (51.06 → 52.21).
 huecos aleatorios y ruido fuerte), el sentido atribuido a −0.14 sin profundidad (favorece a la suma), la referencia
 de E1u (47.31, la publicada) y la comparación sin dropout en el codificador. La versión anterior queda en el
 commit 3f30edd.*
+
+## D-08 · Entrenar con los huecos reales del sensor
+
+**Fecha** 2026-11-02 · **Estado** 🟡 provisional · **Origen** pregunta de Joaquín: «¿cómo va a ayudar la MLCA, o la
+fusión, si nunca se entrena con huecos de profundidad?».
+
+- **Lo que motiva la decisión:** hasta D-07 todo se entrenó con la profundidad rellenada (`depths`), que no tiene
+  ceros. La máscara solo actuó al entrenar con el dropout, que quita la profundidad entera. Es la opción 1 del plan de
+  la auditoría del equipo (E4r/E3r, `auditoria/06_plan_experimentos.md`), y lo que dibuja la Fig. 1 del resumen
+  (la máscara se calcula de la profundidad cruda). En D-07 se priorizó la MLCA en el codificador; visto ahora, para
+  la pregunta del curso pesaba más esto.
+- **Cuánto falta en la cruda** (medido antes de lanzar): el 32.0 % de los píxeles del cuadro en el entrenamiento y el
+  30.7 % en el test (13.9 y 12.3 % en el recorte estándar, 26.8 y 25.6 % de los píxeles etiquetados). Casi todo lo
+  demás es el borde donde el Kinect no cubre la imagen de color. La máscara binaria apaga el 32.6 % de las celdas de
+  1/16 al entrenar.
+- **Decisión:** E11r, E3er y E4er son E11d, E3ed y E4ed con la profundidad cruda al entrenar (`huecos="cruda"`). Se
+  mantienen el dropout 0.3, el orden de los datos y el dropout por semilla, así que respecto de D-07 cambia solo la
+  profundidad de entrenamiento. La validación (completa, para elegir la lr) y el test se evalúan igual que siempre.
+  Con huecos al entrenar, E3er ya no se deriva de E4er: se entrena.
+- **Contrastes** (criterio de D-06, Holm sobre completa, cruda, 50 % aleatoria, regiones y sin): E4er − E11r (la
+  MLCA frente a la suma, las dos entrenadas con huecos), E4er − E3er (la máscara, activa al entrenar), E11r − E11d y
+  E4er − E4ed (qué cambia al entrenar con la cruda).
+- **Predicciones, antes de lanzar:** del equipo (Joaquín: «creería que empata a la suma»),
+  `predicciones/D08_equipo.md`; de la IA, `predicciones/D08_claude.md`.
+- **Comprobado antes de lanzar:** las huellas de las corridas ya hechas no cambian (E11d, E4ed, E2cd, E4e y E8,
+  iguales a las guardadas). En una prueba en CPU, E11d ve la rellenada y E11r la cruda con los mismos lotes, y
+  E3er no se puede derivar de E4er. Pasan las pruebas.
+- **Cola:** `tools/cola_d08.sh` (E4er, E11r, E3er, tablas y criterio), unas 5.5-6 h.

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Integración: entrenamiento, evaluación, reanudación, huellas, derivación y combinaciones, en CPU con datos
 sintéticos y pesos aleatorios (D-06). Los mIoU no significan nada aquí; lo que se comprueba es el protocolo."""
+import dataclasses
 import json
 
 import numpy as np
@@ -29,7 +30,8 @@ def iguales(a, b):
     return a.keys() == b.keys() and all(torch.equal(a[k], b[k]) for k in a)
 
 
-@pytest.mark.parametrize("exp", ["E1", "E2", "E4", "E5", "E2c", "E3c", "E3cd", "E4c", "E4cd", "E4cf", "E1u", "E4ed"])
+@pytest.mark.parametrize("exp", ["E1", "E2", "E4", "E5", "E2c", "E3c", "E3cd", "E4c", "E4cd", "E4cf", "E1u", "E4ed",
+                                 "E4er"])
 def test_cada_experimento_entrena_y_evalua(runs, exp):
     out = E.entrenar(exp, 1e-3, 0, epocas=1, pasos_max=2)
     conds = rgbd.CONDICIONES + ([] if E.EXPERIMENTOS[exp].historico else rgbd.CONDICIONES_EXTRA)
@@ -82,6 +84,33 @@ def test_el_dropout_no_cambia_el_orden_de_los_datos(runs, monkeypatch):
     """D-06: en la familia «c» el dropout usa su propio generador. En la v3 (E5) usaba el de los datos."""
     assert _lotes(monkeypatch, "E4c") == _lotes(monkeypatch, "E4cd")
     assert _lotes(monkeypatch, "E4") != _lotes(monkeypatch, "E5")
+
+
+def _profundidades(monkeypatch, exp):
+    vistas = []
+    original = E.aumentar
+
+    def espia(rgb, prof, et, gen):
+        vistas.append(prof.clone())
+        return original(rgb, prof, et, gen)
+    monkeypatch.setattr(E, "aumentar", espia)
+    E.entrenar(exp, 1e-3, 0, epocas=1, pasos_max=2, nombre=f"profundidad_{exp}")   # otra carpeta que la de _lotes
+    monkeypatch.setattr(E, "aumentar", original)
+    return vistas
+
+
+def test_d08_solo_cambia_la_profundidad_de_entrenamiento(runs, monkeypatch):
+    """D-08: E11r, E3er y E4er son E11d, E3ed y E4ed entrenados con la profundidad cruda, con sus huecos. El orden
+    de los datos no cambia, y como la máscara actúa al entrenar, E3er no se puede derivar de E4er."""
+    for a, b in (("E11d", "E11r"), ("E3ed", "E3er"), ("E4ed", "E4er")):
+        x, y = E.EXPERIMENTOS[a], E.EXPERIMENTOS[b]
+        assert dataclasses.replace(x, huecos="cruda", familia=y.familia, que=y.que) == y
+    rellenada, cruda = _profundidades(monkeypatch, "E11d"), _profundidades(monkeypatch, "E11r")
+    assert all((p > 0).all() for p in rellenada) and all((p == 0).any() for p in cruda)
+    assert _lotes(monkeypatch, "E11d") == _lotes(monkeypatch, "E11r")
+    assert not E.equivalentes_en_entrenamiento("E4er", "E3er")
+    with pytest.raises(ValueError):
+        E.derivar("E4er", "E3er")
 
 
 def test_reanudar_da_el_mismo_resultado(runs, tmp_path, monkeypatch):
