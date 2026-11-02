@@ -60,12 +60,13 @@ TXT = {
         "op_suma": "Suma", "op_mlca": "atención cruzada lineal enmascarada",
         "suma_l": ("W: convolución 1×1 sin sesgo, empieza en 0 (g = f)",
                    "cada posición recibe la profundidad de su posición",
-                   "no usa la máscara: un hueco entra como profundidad 0"),
+                   "no usa la máscara: un hueco entra como profundidad 0",
+                   "el «f +» es la conexión residual: f pasa intacto"),
         "mlca_l": ("q del color; k y v de la profundidad; $W_o$ empieza en 0",
                    "todas las posiciones reciben el mismo resumen S",
                    "de la imagen entera, sin información de posición",
                    "m = validez: binaria (E4) o 1 en todas (E3)",
-                   "sin profundidad: o = 0 y g = f"),
+                   "sin profundidad: o = 0 y g = f (queda la residual)"),
         "color": "color", "profundidad": "profundidad", "hueco": "hueco",
         "D": "D · Profundidad como maestra", "E": "E · Dos expertos y compuerta",
         "D_exp": "E7: E1u + cabeza auxiliar de profundidad\n(peso 1, 3 o 10; se elige en validación)",
@@ -104,12 +105,13 @@ TXT = {
         "op_suma": "Sum", "op_mlca": "masked linear cross-attention",
         "suma_l": ("W: 1×1 convolution without bias, starts at 0 (g = f)",
                    "each position gets the depth at its own position",
-                   "no mask: a hole enters as depth 0"),
+                   "no mask: a hole enters as depth 0",
+                   "the «f +» is the residual connection: f passes intact"),
         "mlca_l": ("q from colour; k and v from depth; $W_o$ starts at 0",
                    "every position gets the same summary S",
                    "of the whole image, with no positional information",
                    "m = validity: binary (E4) or 1 everywhere (E3)",
-                   "without depth: o = 0 and g = f"),
+                   "without depth: o = 0 and g = f (only the residual)"),
         "color": "colour", "profundidad": "depth", "hueco": "hole",
         "D": "D · Depth as a teacher", "E": "E · Two experts and a gate",
         "D_exp": "E7: E1u + auxiliary depth head\n(weight 1, 3 or 10; chosen on validation)",
@@ -195,8 +197,8 @@ def columna_color(ax, t, sub_e4, ls_e4="-", fp=False):
     flecha(ax, [(XC, Y_E4 - H_E4 / 2), (XC, Y_FUS)], punta=False)
     flecha(ax, [(XC - WC / 2, Y_E13), (0.25, Y_E13), (0.25, Y_FUS), (XC, Y_FUS)], punta=False)
     ax.plot([XC], [Y_FUS], "o", color=TINTA, ms=4, zorder=3)
-    etiqueta(ax, 0.42, (Y_E4 - H_E4 / 2 + Y_FUS) / 2, "f₂  f₃", color=TINTA)
-    etiqueta(ax, XC + 0.15, (Y_E4 - H_E4 / 2 + Y_FUS) / 2, "f₄", color=TINTA)
+    etiqueta(ax, 0.42, (Y_E4 - H_E4 / 2 + Y_FUS) / 2, "f₂ · 1/8\nf₃ · 1/16", color=TINTA)
+    etiqueta(ax, XC + 0.15, Y_E4 - H_E4 / 2 - 0.35, "f₄ · 1/32", color=TINTA)
 
 
 def columna_prof(ax, t, p4_al_codificador=False):
