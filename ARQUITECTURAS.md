@@ -38,7 +38,9 @@ Los dos operadores, abajo en la figura:
 
 Esa diferencia explica la mayor parte de los resultados. Con la profundidad completa, la suma le da a cada píxel
 su profundidad y gana: E11d, con 51.26, supera a E4ed, con 49.24. La MLCA da un resumen de toda la imagen, que
-pierde detalle espacial pero se estropea menos cuando la profundidad es mala (cuaderno 12, sección 6).
+pierde detalle espacial pero se estropea menos cuando la profundidad es mala (cuaderno 12, sección 6). En D-08 se
+entrenaron E11d, E3ed y E4ed con la profundidad cruda del sensor en lugar de la rellenada (E11r, E3er y E4er): con
+los huecos del sensor, la suma llega a 51.39, y la MLCA con máscara queda entre 2 y 3.7 puntos bajo ella.
 
 ## Esquemas complementarios
 
@@ -49,6 +51,24 @@ pierde detalle espacial pero se estropea menos cuando la profundidad es mala (cu
 - **E · Dos expertos y compuerta (E8, E9).** Un experto de color y uno RGB-D (con sumas) se mezclan por píxel
   con una compuerta α que solo mira la validez. Donde no hay ninguna medida cerca, α = 0 y la salida es
   exactamente la del experto de color. En E9 ese experto es E1u: sin profundidad da 47.31, lo mismo que E1u.
+
+## Qué pregunta contesta cada comparación
+
+Cada experimento existe para compararlo con otro que cambia en una sola cosa. Diferencias de medias en el test (3
+semillas); la significación de cada contraste está en el cuaderno 12 (sección 5) y en `DECISIONES.md`.
+
+| Pregunta | Se compara | Respuesta |
+|---|---|---|
+| ¿Ayuda la profundidad? | E2c − E1 (cabeza); E11 − E1u (codificador) | Sí, con profundidad completa: +2.54 en la cabeza y +3.75 en el codificador |
+| ¿Dónde rinde más? | E11 − E10 (la misma suma en la cabeza, más la del codificador) | En el codificador: +1.82 |
+| ¿Fusiona mejor la MLCA que la suma? | E2c − E4c, E11 − E4e, E11d − E4ed, E11r − E4er | No: con profundidad, la suma gana en los cuatro pares (+1.67 a +3.67) |
+| ¿Sirve la máscara? | E4c − E3c, E4e − E3e (derivados) y E4er − E3er (D-08, entrenado) | Solo sin profundidad y sin dropout (+9.39 en el codificador); con los huecos del sensor, de −0.63 a +0.10; activa al entrenar, perjudica (−1.07 a −3.82) |
+| ¿Sin dropout, la MLCA aguanta mejor una profundidad mala? | E4e − E11 | Sí: −1.67 con profundidad completa, pero +5.98 con el 50 % de huecos y +23.0 sin profundidad |
+| ¿Da robustez el *modality dropout*? | E2cd − E2c, E4cd − E4c, E11d − E11, E4ed − E4e | Sí y sin costo: de −0.15 a +0.52 con profundidad completa y de +8.5 a +31.7 sin ella |
+| ¿Y entrenar con los huecos del sensor? | E11r − E11d, E4er − E4ed (D-08) | A la suma le sirve con esos huecos (+0.98; 51.39) y le cuesta ~0.6 con profundidad completa; a la MLCA, no |
+| ¿Basta la profundidad como maestra al entrenar? | E7 − E1u | No: −0.03 |
+| ¿Y dos expertos con compuerta? | E9 − E1u | Sin profundidad da exactamente solo color; con ella, +0.45 |
+| ¿Cuál es el mejor modelo único? | todos frente a E1u (47.31) | Con profundidad completa, E11d (51.26); con la del sensor, E11r (51.39) |
 
 ## Catálogo
 
@@ -80,9 +100,9 @@ pierde detalle espacial pero se estropea menos cuando la profundidad es mala (cu
 | E4e | D-07 | C | E11 con MLCA (máscara binaria) en el codificador | suma | MLCA binaria | C3·P4·C5 | ajustada | rellenada | 0.001 | 49.39 | 47.78 | 39.37 | 38.75 |
 | E3ed | D-07 | C | E3e + dropout 0.3 | suma | MLCA sin máscara | C3·P4·C5 | ajustada | rellenada + dropout 0.3 | — | no se corrió | | | | |
 | E4ed | D-07 | C | E4e + dropout 0.3 | suma | MLCA binaria | C3·P4·C5 | ajustada | rellenada + dropout 0.3 | 0.001 | 49.24 | 48.49 | 44.10 | 47.29 |
-| E11r | D-08 | C | E11d entrenado con la cruda | suma | suma (W′·P4) | C3·P4·C5 | ajustada | cruda + dropout 0.3 | — | en cola | | | | |
-| E3er | D-08 | C | E3ed entrenado con la cruda | suma | MLCA sin máscara | C3·P4·C5 | ajustada | cruda + dropout 0.3 | — | en cola | | | | |
-| E4er | D-08 | C | E4ed entrenado con la cruda | suma | MLCA binaria | C3·P4·C5 | ajustada | cruda + dropout 0.3 | — | en curso (2/3 semillas) | | | | |
+| E11r | D-08 | C | E11d entrenado con la cruda | suma | suma (W′·P4) | C3·P4·C5 | ajustada | cruda + dropout 0.3 | 0.001 | 50.63 | 51.39 | 45.46 | 47.31 |
+| E3er | D-08 | C | E3ed entrenado con la cruda | suma | MLCA sin máscara | C3·P4·C5 | ajustada | cruda + dropout 0.3 | 0.001 | 49.00 | 49.34 | 45.55 | 47.12 |
+| E4er | D-08 | C | E4ed entrenado con la cruda | suma | MLCA binaria | C3·P4·C5 | ajustada | cruda + dropout 0.3 | 0.003 | 46.96 | 48.27 | 41.73 | 45.27 |
 
 mIoU en el test oficial de NYUv2 (654 imágenes, 40 clases), media de 3 semillas con la lr elegida en la validación por escenas. Fuente: los `resultado.json` de `runs/rgbd/`, leídos con `estadistica.cargar`; las mismas cifras, con desviación, IC y cada semilla, están en `auditoria/05_tablas_estadisticas.md`. Las de la v3 y D-03 a D-05 son exploratorias (el test se usó en esas decisiones).
 

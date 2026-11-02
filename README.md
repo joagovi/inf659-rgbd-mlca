@@ -1,7 +1,8 @@
 # Masked Linear Cross-Attention for Robust RGB-D Semantic Segmentation
 
-**MLCA** fuses a frozen EfficientViT-B1 (RGB) and a frozen DeFM ResNet-18 (depth) with a linear cross-attention
-that **excludes the pixels where the depth sensor gave no reading**. RGB features query; depth features answer.
+**MLCA** fuses EfficientViT-B1 (RGB; frozen, or with only its last stage fine-tuned) and a frozen DeFM ResNet-18
+(depth) with a linear cross-attention that **excludes the pixels where the depth sensor gave no reading**. RGB
+features query; depth features answer.
 
 $$o_i = \frac{\varphi(q_i)^\top S}{\varphi(q_i)^\top z + \varepsilon},\qquad
 S = \sum_j m_j\,\varphi(k_j)\,v_j^\top,\qquad z = \sum_j m_j\,\varphi(k_j),\qquad \varphi = \mathrm{ReLU}$$
@@ -50,6 +51,7 @@ so its value is the same in every condition. Details and all conditions:
 | E2cd | E2c with modality dropout | done (D-07) |
 | E10, E11, E11d | Last RGB stage fine-tuned; E11 also adds depth at the input of that stage (sum); E11d adds modality dropout | done (D-05, D-07) |
 | E3e, E4e, E4ed | MLCA instead of the sum at the input of the last RGB stage, without and with the mask; E4ed adds modality dropout | done (D-07) |
+| E11r, E3er, E4er | E11d, E3ed (not run) and E4ed trained on the raw sensor depth, with its holes, instead of the filled one | done (D-08) |
 | E6 | E4 with a masked softmax attention (as in UCTNet) | future work |
 
 **Audit D-06 (2026-10-29).** In the released DeFM ResNet-18 weights only the BiFPN P4 output depends on the input;
@@ -66,7 +68,7 @@ exploratory (the test set was used for diagnostics). Details: [`auditoria/`](aud
 | E4 · MLCA | 45.24 ± 0.29 | 45.04 ± 0.19 | 44.87 ± 0.39 | 41.89 ± 1.40 | 0.78 ± 1.22 |
 | E5 · MLCA + dropout 0.3 | 45.48 ± 0.21 | 45.45 ± 0.20 | 45.39 ± 0.07 | 44.25 ± 0.73 | 45.74 ± 0.10 |
 
-## Results of the corrected design (D-06, D-07)
+## Results of the corrected design (D-06 to D-08)
 
 Test, mean of 3 seeds, mIoU (%). Each cell goes from *no dropout* to *modality dropout* (0.3); MLCA uses the
 binary mask. In the encoder rows, depth also enters at the input of the last RGB stage, which is fine-tuned.
@@ -93,13 +95,30 @@ binary mask. In the encoder rows, depth also enters at the input of the last RGB
 - **The best single model, E11d**, is 3.95 above RGB only with full depth and 3.10 with the sensor's holes, and
   matches it with no depth. DeFM takes 24.3 of the ~31.8 GFLOPs; MLCA adds 0.14–0.49 GFLOPs over the sum.
 
+**Training on the raw sensor depth (D-08).** Until D-07 every model was trained on NYUv2's filled depth, which has
+no holes, so the mask acted during training only through modality dropout. D-08 retrains the encoder variants with
+dropout on the raw depth, where about 31 % of the pixels have no reading:
+
+| Encoder variant, modality dropout | Trained on | Full depth | Raw sensor holes | 50 % random holes | No depth |
+|---|---|---|---|---|---|
+| sum (E11d → E11r) | filled → raw | 51.26 → 50.63 | 50.41 → **51.39** | 45.48 → 45.46 | 47.43 → 47.31 |
+| MLCA (E4ed → E4er) | filled → raw | 49.24 → 46.96 | 48.49 → 48.27 | 44.10 → 41.73 | 47.29 → 45.27 |
+| attention without mask (E3er) | raw | 49.00 | 49.34 | 45.55 | 47.12 |
+
+- **On real sensor depth, the best single model is now E11r (51.39)**: +0.98 over E11d and +4.08 over RGB only, at
+  a cost of about 0.6 with full depth. Training on the sensor's holes does not help with random holes.
+- **It does not help MLCA.** MLCA stays 2.0–3.7 below the sum in all five conditions of the criterion, and the
+  mask, now active during training, hurts (E4er − E3er from −1.07 to −3.82). Caveat: the validation picked a higher
+  learning rate for E4er (3e-3, the other two 1e-3), and E4er is the least stable variant across seeds.
+
 Pre-registered criterion (paired image bootstrap with Holm, same sign in the 3 seeds), all tables, mechanism and
 cost: [`notebooks/12_resultados.ipynb`](notebooks/12_resultados.ipynb) and [`DECISIONES.md`](DECISIONES.md).
 
 ## Repository
 
 ```
-proposal/      project proposal (Spanish), WAIMLAp extended abstract and poster, figures
+proposal/      project proposal (Spanish), WAIMLAp extended abstract and poster (v2 draft and the team's version,
+               with what to change for the final one), figures
 src/
   mlca.py              the MLCA block
   rgbd.py              EfficientViT-B1 + DeFM ResNet-18 + fusion; DeFM preprocessing; depth conditions
@@ -114,7 +133,7 @@ notebooks/
   09_mlca_bloque       the block on synthetic data: exact RGB path, exact hole exclusion, linear cost
   10_nyuv2_huecos      the real holes of NYUv2 raw depth: how many, where, which classes, which scale
   11_e1_e2_nyuv2       results of E1 and E2
-  12_resultados        results of D-06 and D-07: all tables, robustness figure, criterion, mechanism, cost
+  12_resultados        results of D-06 to D-08: all tables, robustness figure, criterion, mechanism, cost
 tests/         106 automated tests (CPU with synthetic data and random weights; 2 GPU-only)
 auditoria/     D-06 audit: findings, coherence matrix, v2/v3 comparison, DeFM report, tables, plan, verification
 DECISIONES.md  decisions and predictions written before each experiment
@@ -139,7 +158,7 @@ class. `11_e1_e2_nyuv2` only reads those files. Notebooks 09 and 10 compute with
 | `notebooks/09_mlca_bloque` | notebook | no | Checks of the MLCA block on synthetic data; frozen encoders' feature shapes |
 | `notebooks/10_nyuv2_huecos` | notebook | no | Real holes of NYUv2 raw depth |
 | `notebooks/11_e1_e2_nyuv2` | notebook | no | Tables and figures of E1 and E2 from `resultado.json` |
-| `notebooks/12_resultados` | notebook | no | Tables and figures of D-06 and D-07 from `resultado.json`, the criterion, the diagnostics and the cost (seconds) |
+| `notebooks/12_resultados` | notebook | no | Tables and figures of D-06 to D-08 from `resultado.json`, the criterion, the diagnostics and the cost (seconds) |
 
 ## Reproduce
 
@@ -158,7 +177,8 @@ Data (not versioned), in `datos/nyuv2/`:
 - `classMapping40.mat`: https://github.com/ankurhanda/nyuv2-meta-data
 
 DeFM code is loaded from `torch.hub` at a pinned commit (`leggedrobotics/defm:4849a36`) and both checkpoints from
-Hugging Face; their SHA-256 is stored in every `resultado.json` (`src/procedencia.py`). Then:
+Hugging Face at pinned revisions, checked against their SHA-256, which is also stored in every `resultado.json`
+(`src/procedencia.py`). Then:
 
 ```bash
 pytest -q                                                   # tests; no data or weights needed (D-06)
@@ -185,5 +205,6 @@ One run takes 12–16 minutes on an RTX 4060 Laptop GPU (8 GB).
 Code and much of the text were written with the help of Claude (Anthropic), as allowed by the course and
 declared in [`DECISIONES.md`](DECISIONES.md). The team wrote its predictions before E1, E2, E4 and E5. D-03 to D-05
 ran without registered predictions, at the team's request. For D-06 and D-07 the team wrote none; the AI's
-predictions, written before each run ([`predicciones/`](predicciones/)), serve as the pre-registration. The AI also
-drafted the analysis of D-06 and D-07, which the team reviews.
+predictions, written before each run ([`predicciones/`](predicciones/)), serve as the pre-registration. For D-08 the
+team also wrote one (MLCA would tie with the sum), which did not hold. The AI also drafted the analysis of D-06 to
+D-08, which the team reviews.

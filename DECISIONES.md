@@ -618,3 +618,68 @@ fusión, si nunca se entrena con huecos de profundidad?».
   iguales a las guardadas). En una prueba en CPU, E11d ve la rellenada y E11r la cruda con los mismos lotes, y
   E3er no se puede derivar de E4er. Pasan las pruebas.
 - **Cola:** `tools/cola_d08.sh` (E4er, E11r, E3er, tablas y criterio), unas 5.5-6 h.
+
+## Resultados de D-08 (E11r, E3er y E4er, entrenados con la profundidad cruda)
+
+Medido el 2026-11-02 (test, 3 semillas; `tools/cola_d08.sh`, de 07:56 a 13:28, sin pausas). Las predicciones del
+equipo y de la IA se contrastan en `predicciones/D08_resultado.md`. Elegido en la validación por escenas (completa,
+semilla 0): E4er 3e-3, tras probar 1e-2 por la regla del extremo (44.99 / 45.93 / 46.25 / 33.53 con 3e-4 / 1e-3 /
+3e-3 / 1e-2); E11r 1e-3 (46.26 / 46.81 / 46.02 con 3e-4 / 1e-3 / 3e-3); E3er 1e-3 (45.23 / 46.20 / 45.69).
+
+| Modelo | completa | cruda | aleatoria 10 / 30 / 50 % | regiones 0.25 / 0.5 / 0.75 / 1.0 | sin | ruido 10 / 20 / 50 cm |
+|---|---|---|---|---|---|---|
+| E1u (referencia) | 47.31 ± 0.10 | igual | igual | igual | igual | igual |
+| E11d (referencia, D-07) | 51.26 ± 0.35 | 50.41 | 50.37 / 47.06 / 45.48 | 51.07 / 50.57 / 49.65 / 48.31 | 47.43 ± 0.18 | 50.04 / 49.17 / 47.43 |
+| E4ed (referencia, D-07) | 49.24 ± 0.11 | 48.49 | 48.32 / 45.43 / 44.10 | 49.07 / 48.60 / 47.78 / 47.00 | 47.29 ± 0.09 | 48.18 / 47.40 / 45.95 |
+| **E11r** | 50.63 ± 0.44 | **51.39 ± 0.30** | 49.90 / 47.23 / 45.46 | 50.48 / 49.98 / 49.04 / 47.67 | 47.31 ± 0.23 | 49.44 / 48.55 / 47.03 |
+| E3er | 49.00 ± 0.15 | 49.34 ± 0.21 | 48.59 / 46.54 / 45.55 | 48.87 / 48.51 / 47.88 / 47.22 | 47.12 ± 0.13 | 48.31 / 47.69 / 46.58 |
+| E4er | 46.96 ± 0.68 | 48.27 ± 0.29 | 46.02 / 42.72 / 41.73 | 46.76 / 46.31 / 45.49 / 44.65 | 45.27 ± 0.56 | 46.04 / 45.32 / 43.64 |
+
+**Criterio** (`tools/criterio_d06.py`, Holm sobre completa, cruda, 50 % aleatoria, regiones y sin;
+`runs/rgbd/criterio_d08.txt`):
+
+| Contraste | completa | cruda | 50 % aleatoria | regiones | sin |
+|---|---|---|---|---|---|
+| E4er − E11r (MLCA frente a suma, las dos con la cruda) | −3.67, **perjudica** | −3.12, **perjudica** | −3.73, **perjudica** | −3.67, **perjudica** | −2.04, **perjudica** |
+| E4er − E3er (la máscara, activa al entrenar) | −2.05, **perjudica** | −1.07, **perjudica** | −3.82, **perjudica** | −2.20, **perjudica** | −1.85, **perjudica** |
+| E11r − E11d (cruda frente a rellenada, suma) | −0.63, **perjudica** | +0.98, **aporta** | −0.03, no aporta | −0.59, **perjudica** | −0.12, no aporta |
+| E4er − E4ed (cruda frente a rellenada, MLCA; cambia también la lr) | −2.28, **perjudica** | −0.22, no aporta | −2.37, no concluyente | −2.28, **perjudica** | −2.02, **perjudica** |
+
+- **Con la profundidad del sensor, el mejor modelo único es ahora E11r: 51.39 en la cruda**, +0.98 sobre E11d
+  («aporta»; +0.95 / +1.28 / +0.70 por semilla) y +4.08 sobre solo color. Entrenado con la cruda, rinde más con ella
+  que con la rellenada (51.39 frente a 50.63): se especializa en el sensor real. El par E1u + E11 con
+  `relleno_interruptor` llega a 51.77, pero con dos modelos y rellenando la profundidad al evaluar.
+- **Lo que cuesta es poco**: de −0.40 a −0.64 con profundidad completa, regiones, ruido y el 10 % aleatorio
+  (completa −0.63 y regiones −0.59, «perjudica»; en completa, −0.75 / −0.08 / −1.07 por semilla), del orden del no
+  determinismo de la GPU entre corridas idénticas (~0.7, D-06). Sin profundidad, nada (−0.12; 47.31, lo mismo que
+  E1u).
+- **No enseña a convivir con huecos aleatorios**: −0.03 con el 50 % («no aporta») y +0.17 con el 30 %. Los huecos
+  del sensor no están repartidos al azar (casi todos son el borde que el Kinect no cubre; ver D-08), así que la red
+  aprende ese patrón y no otro.
+- **La MLCA no empata con la suma; la predicción del equipo no se cumple.** E4er − E11r va de −2.04 a −3.73,
+  «perjudica» en las cinco condiciones y en las 3 semillas. Con la rellenada (E4ed − E11d) la brecha iba de −1.38 a
+  −2.02 con profundidad y era −0.14 sin ella: con la cruda crece en todas las condiciones.
+- **A la MLCA, entrenar con la cruda no le sirvió**: E4er − E4ed ≈ −2.3, parejo en todas las condiciones (de −2.02 a
+  −2.71) salvo la cruda (−0.22, «no aporta»). Una caída pareja apunta a una red peor entrenada, no a algo propio de
+  los huecos; en la cruda la compensa lo que gana al entrenar con ella, como en la suma.
+- **La máscara, ahora activa al entrenar, perjudica**: E4er − E3er va de −1.07 (cruda) a −3.82 (50 % aleatoria), en
+  las cinco condiciones. Sin máscara, la atención entrenada con la cruda (E3er) es la variante más estable del
+  estudio: desviación entre semillas de 0.12 a 0.29 y la menor caída con el 50 % aleatorio (3.45, frente a 5.17 de
+  E11r y 5.23 de E4er); con el 50 % aleatorio empata con la suma (45.55 frente a 45.46). Frente a E4ed gana con huecos
+  (+0.85 en la cruda, +1.45 con el 50 %) y empata en completa (−0.24) y sin (−0.17); su gemelo exacto con la
+  rellenada, E3ed, no se corrió.
+- **Cautela con E4er: su lr.** La validación eligió 3e-3 por 0.32 sobre 1e-3 (46.25 frente a 45.93; con 1e-2
+  diverge), mientras E11r y E3er quedaron en 1e-3. Con 3e-3, E4er es la variante más inestable (desviación de 0.68
+  en completa y de 2.68 con el 50 % aleatorio: 43.69 / 42.81 / 38.68 por semilla) y sin profundidad queda bajo solo
+  color en las 3 semillas (45.91 / 45.03 / 44.87; E1u 47.31). E4er − E3er y E4er − E4ed mezclan, entonces, la máscara
+  o los datos con la lr. Con la misma lr (1e-3), la validación ya ponía a E4er bajo E3er (−0.27) y bajo E11r
+  (−0.88): el sentido de las conclusiones no depende de la lr; el tamaño, quizá sí. El control (E4er con 1e-3, 3
+  semillas, ~1 h de GPU) no se corrió.
+- **Para la pregunta del curso**, D-08 confirma D-06 y D-07 en la versión de la hipótesis más favorable a la MLCA
+  (máscara activa al entrenar, en el codificador): la robustez viene del entrenamiento (el dropout y, para los
+  huecos del sensor, entrenar con ellos), no de la máscara, y con profundidad la suma gana.
+
+**Cierre de los experimentos** (2026-11-02, Joaquín: «ya no hay tiempo para D-09 y menos para la Fase C»): no hay
+D-09. Quedan como trabajo futuro: la Fase C (SUN RGB-D, sin reentrenar); un solo modelo entrenado con una mezcla
+de profundidad cruda, rellenada y huecos simulados; solo profundidad (DeFM con la cabeza); E3ed; el control de lr de
+E4er; y E6 (atención softmax enmascarada, como UCTNet).
