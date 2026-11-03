@@ -81,13 +81,20 @@ def resultados(e, c):
     return r["lr"], medias, gemelo
 
 
+def lineas_registro():
+    """Línea de cada experimento en `EXPERIMENTOS`, para enlazarlo desde la tabla."""
+    texto = (RAIZ / "src" / "entrenar_rgbd.py").read_text(encoding="utf-8").splitlines()
+    return {m.group(1): i for i, l in enumerate(texto, 1) if (m := re.match(r'\s+"(E\w+)": Exp\(', l))}
+
+
 def tabla():
+    lineas = lineas_registro()
     filas = ["| Exp. | Dec. | Esq. | Qué es | Cabeza | Codificador | Rasgos de prof. | Etapa 4 | Profundidad al "
              "entrenar | lr | Completa | Cruda | 50 %* | Sin |",
              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for e, c in EXPERIMENTOS.items():
         lr, medias, gemelo = resultados(e, c)
-        nombre = f"{e}†" if gemelo else e
+        nombre = f"[{e}](src/entrenar_rgbd.py#L{lineas[e]})" + ("†" if gemelo else "")
         que = c.que + (f" (derivado de {gemelo})" if gemelo else "")
         rasgos = "—" if c.fusion == "rgb" else ("C3·P4·C5" if c.rasgos == "c3p4c5" else "P3·P4·P5")
         etapa4 = "ajustada" if "stage4" in c.entrenable else "congelada"
@@ -112,7 +119,8 @@ def tabla():
         "que es la misma red que su gemelo, evaluada con otra máscara (D-06).",
         "",
         "Esq.: el panel de las figuras (A-E). Dec.: la decisión de `DECISIONES.md` que lo introdujo (v3: el diseño "
-        "de la propuesta, antes de D-01).",
+        "de la propuesta, antes de D-01). El nombre de cada experimento enlaza a su configuración en el registro "
+        "`EXPERIMENTOS` de `src/entrenar_rgbd.py`.",
     ]
     return "\n".join(filas + notas)
 
