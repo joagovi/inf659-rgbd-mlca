@@ -112,3 +112,30 @@ mIoU en el test oficial de NYUv2 (654 imágenes, 40 clases), media de 3 semillas
 
 Esq.: el panel de las figuras (A-E). Dec.: la decisión de `DECISIONES.md` que lo introdujo (v3: el diseño de la propuesta, antes de D-01).
 <!-- catálogo: fin -->
+
+## Cómo se corre cada experimento y dónde quedan sus salidas
+
+Cada fila del catálogo es una entrada del registro `EXPERIMENTOS` de `src/entrenar_rgbd.py` (su configuración: fusión,
+rasgos de profundidad, etapa 4, dropout, máscara y profundidad de entrenamiento), y el modelo que dibuja su panel
+(columna «Esq.») lo arma `src/rgbd.py` (`RGBD`) a partir de esa configuración. Todos usan el mismo protocolo; solo
+cambia el nombre del experimento:
+
+| Qué | Comando (desde la raíz del repositorio) |
+|---|---|
+| Barrido de lr en la validación por escenas, elección y 3 semillas en el test | `python src/entrenar_rgbd.py --completo E11r` |
+| Una sola corrida | `python src/entrenar_rgbd.py --exp E11r --lr 1e-3 --semilla 0` |
+| Un derivado sin entrenar (los † del catálogo) | `python src/entrenar_rgbd.py --derivar E4e E3e` |
+| Combinación sin entrenar de dos modelos | `python src/combinar.py --color E1u --fusion E11d` |
+| Una decisión completa, reanudable | `bash tools/cola_d06.sh`, `cola_d07.sh`, `cola_d08.sh` (D-05: `cola_d05.sh`) |
+| Tablas, criterio y catálogo | `python src/estadistica.py`; `python tools/criterio_d06.py ...`; `python tools/catalogo_experimentos.py` |
+
+Qué cola corrió cada uno: D-05, `cola_d05.sh` (E2u, E10, E11); D-06, `cola_d06.sh` (E4c, E3c, E4cf, E4cd, E3cd,
+E4cfd, E2c); D-07, `cola_d07.sh` (E11d, E2cd, E4e, E3e, E4ed); D-08, `cola_d08.sh` (E4er, E11r, E3er). Los de la v3 y
+D-03/D-04 (E1, E2, E4, E5, E1u, E7, E8, E2h, E9) se corrieron con `--completo` uno a uno; `tools/reproducir_historicos.py`
+comprueba que el código actual los reproduce.
+
+Cada corrida escribe en `runs/rgbd/<exp>_lr<lr>_s<semilla>/` (las de validación, con el prefijo `val_`):
+`resultado.json` (mIoU por condición y por clase, configuración, huella, lr, minutos, entorno y SHA-256 de los pesos
+preentrenados), `por_imagen.npz` (intersección y unión por imagen y clase, para el bootstrap), `cabeza.pt` (lo
+entrenado) y `estado.pt` (para reanudar). `runs/` no se versiona (pesos); el paquete del equipo trae los
+`resultado.json` y `por_imagen.npz`, sin los `.pt`.
