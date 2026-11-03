@@ -65,6 +65,7 @@ BiFPN, todos congelados. La carga [`cargar_defm`](src/rgbd.py#L80) y sus rasgos 
 | Entrenamiento, validación y evaluación | [`entrenar`](src/entrenar_rgbd.py#L340), [`evaluar`](src/entrenar_rgbd.py#L290), [`completo`](src/entrenar_rgbd.py#L505), [`derivar`](src/entrenar_rgbd.py#L558) |
 | Lectura de NYUv2 y la validación por escenas | [`src/nyuv2.py`](src/nyuv2.py) |
 | Estadística y criterio | [`src/estadistica.py`](src/estadistica.py), [`tools/criterio_d06.py`](tools/criterio_d06.py) |
+| Ejemplos de lo que predice cada modelo (color, profundidad cruda, etiqueta y la segmentación de E1u, E11, E11d, E11r y E4ed con profundidad completa, cruda y sin ella) | [`tools/figura_predicciones.py`](tools/figura_predicciones.py) → `notebooks/figs/12_2_predicciones_*.png` (ES) y `proposal/figs/predicciones_*_en.png` (EN) |
 | Estas figuras y este catálogo | [`tools/figura_arquitecturas.py`](tools/figura_arquitecturas.py), [`tools/catalogo_experimentos.py`](tools/catalogo_experimentos.py) |
 
 ## Esquemas principales
