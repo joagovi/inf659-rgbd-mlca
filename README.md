@@ -192,6 +192,8 @@ One run takes 12–16 minutes on an RTX 4060 Laptop GPU (8 GB).
 
 ## Key references
 
+Related work, with published NYUv2 results next to ours and where this work stands: [`proposal/TRABAJO_RELACIONADO.md`](proposal/TRABAJO_RELACIONADO.md) (Spanish).
+
 - H. Cai et al., *EfficientViT: Multi-scale linear attention for high-resolution dense prediction*, ICCV 2023.
 - M. Patel et al., *DeFM: Learning foundation representations from depth for robotics*, IEEE T-RO (conditionally
   accepted), 2026. arXiv:2601.18923.
